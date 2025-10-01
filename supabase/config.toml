@@ -1,0 +1,13 @@
+project_id = "lqmcokwbqnjuufcvodos"
+
+[functions.process-relworx-payment]
+verify_jwt = false
+
+[functions.mm-deposit]
+verify_jwt = false
+
+[functions.request-payment-status]
+verify_jwt = false
+
+[functions.send-payment-status]
+verify_jwt = false

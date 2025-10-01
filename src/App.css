@@ -1,0 +1,36 @@
+
+/* Gold text */
+.gold-text {
+  background: linear-gradient(to right, #bf9b30 0%, #ffcf40 40%, #ffdc73 50%, #ffcf40 60%, #bf9b30 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0px 0px 4px rgba(255, 207, 64, 0.4);
+}
+
+/* Gold text light variant */
+.text-yawatu-gold-light {
+  color: #ffdc73;
+}
+
+/* Make sure the logo is visible */
+img[src="/lovable-uploads/20f4ac2e-05d8-4232-a9e9-fb42d42e4b18.png"] {
+  object-fit: contain;
+  background: transparent;
+}
+
+/* Ensure logo visibility in dark mode */
+.dark img[src="/lovable-uploads/20f4ac2e-05d8-4232-a9e9-fb42d42e4b18.png"] {
+  filter: brightness(1.2);
+}
+
+/* Copy the logo styles for yawatu-logo.png */
+img[src="/yawatu-logo.png"] {
+  object-fit: contain;
+  background: transparent;
+}
+
+/* Ensure logo visibility in dark mode */
+.dark img[src="/yawatu-logo.png"] {
+  filter: brightness(1.2);
+}

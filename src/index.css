@@ -1,0 +1,268 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Gold & Charcoal Theme - Light Mode */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 15%;
+
+    --primary: 43 74% 49%;  /* Rich gold */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 17%;  /* Charcoal */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 43 20% 95%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 43 74% 49%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 43 20% 90%;
+    --input: 43 20% 90%;
+    --ring: 43 74% 49%;
+
+    --radius: 0.75rem;
+
+    /* Action colors for consistent branding */
+    --action-buy: 217 91% 60%;    /* Blue for Buy */
+    --action-sell: 0 84% 60%;     /* Red for Sell */
+    --action-deposit: 142 76% 36%; /* Green for Deposit */
+    --action-withdraw: 0 84% 60%;  /* Red for Withdraw */
+    --action-transfer: 25 95% 53%; /* Orange for Transfer */
+    
+    /* Legacy accent colors */
+    --accent-blue: 217 91% 60%;
+    --accent-green: 142 76% 36%;
+    --accent-purple: 262 76% 60%;
+    --accent-orange: 25 95% 53%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 45 55% 52%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Yawatu 256 PLC specific variables for light mode */
+    --yawatu-background: 0 0% 100%;
+    --yawatu-foreground: 0 0% 3.9%;
+    --yawatu-card: 0 0% 100%;
+    --yawatu-card-foreground: 0 0% 3.9%;
+    
+    /* Premium PLC gradients */
+    --gradient-plc-primary: linear-gradient(135deg, hsl(45 55% 52%), hsl(45 65% 62%));
+    --gradient-plc-secondary: linear-gradient(180deg, hsl(0 0% 5%), hsl(0 0% 15%));
+    --shadow-plc-elegant: 0 10px 30px -10px hsl(45 55% 52% / 0.3);
+    --shadow-plc-glow: 0 0 40px hsl(45 65% 62% / 0.4);
+  }
+
+  .dark {
+    /* Gold & Charcoal Theme - Dark Mode */
+    --background: 0 0% 10%;  /* Dark charcoal */
+    --foreground: 43 20% 95%;
+
+    --card: 0 0% 12%;
+    --card-foreground: 43 20% 95%;
+
+    --popover: 0 0% 12%;
+    --popover-foreground: 43 20% 95%;
+
+    --primary: 43 74% 49%;  /* Gold remains consistent */
+    --primary-foreground: 0 0% 10%;
+
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 43 20% 95%;
+
+    --muted: 0 0% 20%;
+    --muted-foreground: 43 10% 70%;
+
+    --accent: 43 74% 49%;
+    --accent-foreground: 0 0% 10%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 43 74% 49%;
+    
+    --sidebar-background: 0 0% 15%;
+    --sidebar-foreground: 45 30% 55%;
+    --sidebar-primary: 45 55% 52%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 20%;
+    --sidebar-accent-foreground: 45 40% 65%;
+    --sidebar-border: 0 0% 25%;
+    --sidebar-ring: 45 55% 52%;
+
+    /* Yawatu 256 PLC specific variables for dark mode */
+    --yawatu-background: 0 0% 10%;
+    --yawatu-foreground: 45 40% 65%;
+    --yawatu-card: 0 0% 15%;
+    --yawatu-card-foreground: 45 40% 65%;
+    
+    /* Premium PLC dark mode enhancements */
+    --gradient-plc-dark: linear-gradient(135deg, hsl(45 55% 52%), hsl(45 45% 42%));
+    --glow-plc-accent: 0 0 20px hsl(45 55% 52% / 0.3);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* Custom utility classes for Gold & Charcoal Theme */
+.gold-text {
+  @apply text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/80;
+}
+
+.gold-gradient {
+  @apply bg-gradient-to-br from-primary/10 via-primary/5 to-primary/10;
+}
+
+.soft-shadow {
+  @apply shadow-lg shadow-primary/10;
+}
+
+.elegant-card {
+  @apply bg-card border border-border/50 rounded-lg soft-shadow hover:shadow-xl hover:shadow-primary/20 transition-all duration-300;
+}
+
+.gold-button {
+  @apply bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg;
+}
+
+.charcoal-section {
+  @apply bg-secondary text-secondary-foreground;
+}
+
+.hero-overlay {
+  @apply absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-black/60;
+}
+
+.mining-pattern {
+  background-image: radial-gradient(circle at 25% 25%, hsl(var(--primary)) 1px, transparent 1px),
+                    radial-gradient(circle at 75% 75%, hsl(var(--primary)/0.5) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: 0 0, 20px 20px;
+  opacity: 0.1;
+}
+
+.premium-text {
+  @apply text-lg font-medium tracking-wide;
+}
+
+/* Text truncation utilities for mobile optimization */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Mobile-specific optimizations for better touch interaction */
+.mobile-optimized-button {
+  min-height: 44px; /* Apple's recommended minimum touch target size */
+  min-width: 44px;
+}
+
+/* Improved modal handling for mobile */
+.mobile-modal {
+  max-height: calc(100vh - 2rem);
+  margin: 1rem;
+}
+
+/* Better scroll handling on mobile */
+.mobile-scroll-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Prevent zoom on input focus on mobile */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  select,
+  textarea {
+    font-size: 16px !important;
+    transform: translateZ(0); /* Prevent zoom */
+  }
+}
+
+/* Enhanced touch targets for mobile */
+.touch-target {
+  padding: 12px;
+  margin: 4px;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Sticky headers for better mobile UX */
+.sticky-mobile-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: hsl(var(--background));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Mobile viewport optimization */
+.mobile-viewport-container {
+  min-height: calc(100vh - 4rem);
+  overflow-x: hidden;
+}
+
+/* Safe area support for modern mobile devices */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-pt {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Better dialog z-index hierarchy */
+.dialog-overlay {
+  z-index: 70;
+}
+
+.mobile-nav {
+  z-index: 60;
+}
+
+.dropdown-content {
+  z-index: 80;
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+}
