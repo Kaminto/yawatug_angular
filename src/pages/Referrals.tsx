@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserLayout } from '@/components/layout/UserLayout';
 import { supabase } from '@/integrations/supabase/client';
-import SimplifiedReferralDashboard from '@/components/referral/SimplifiedReferralDashboard';
+import SimpleReferralSummary from '@/components/referral/SimpleReferralSummary';
 
 const Referrals = () => {
   const [user, setUser] = useState<any>(null);
@@ -46,16 +46,9 @@ const Referrals = () => {
   }
 
   return (
-    <UserLayout title="Earn 5% Commissions" breadcrumbs={breadcrumbs}>
+    <UserLayout title="Referral Program" breadcrumbs={breadcrumbs}>
       <div className="w-full max-w-full overflow-x-hidden">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight">Referral Program</h1>
-          <p className="text-muted-foreground mt-2">
-            Invite friends to invest in gold mining shares and earn 5% commission on every purchase
-          </p>
-        </div>
-        
-        <SimplifiedReferralDashboard userId={user.id} />
+        <SimpleReferralSummary userId={user.id} />
       </div>
     </UserLayout>
   );

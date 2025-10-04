@@ -153,13 +153,17 @@ const TransactionApprovalModal: React.FC<TransactionApprovalModalProps> = ({
 
     setProcessing(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('❌ Auth error:', authError);
+        throw new Error('Not authenticated');
+      }
 
-      console.log('Approving transaction:', transaction.id);
+      console.log('✅ User authenticated:', user.id);
+      console.log('🔄 Approving transaction:', transaction.id);
 
       // Update transaction status
-      const { error: transactionError } = await supabase
+      const { data: updateData, error: transactionError } = await supabase
         .from('transactions')
         .update({
           approval_status: 'approved',
@@ -167,40 +171,52 @@ const TransactionApprovalModal: React.FC<TransactionApprovalModalProps> = ({
           approved_by: user.id,
           approved_at: new Date().toISOString()
         })
-        .eq('id', transaction.id);
+        .eq('id', transaction.id)
+        .select();
+
+      console.log('📊 Update response:', { data: updateData, error: transactionError });
 
       if (transactionError) {
-        console.error('Error updating transaction:', transactionError);
-        throw transactionError;
+        console.error('❌ Error updating transaction:', transactionError);
+        throw new Error(`Database update failed: ${transactionError.message} (${transactionError.code})`);
       }
 
-      console.log('Transaction updated successfully');
+      if (!updateData || updateData.length === 0) {
+        console.error('⚠️ No rows updated - possible RLS policy issue');
+        throw new Error('Transaction update failed - insufficient permissions or transaction not found');
+      }
+
+      console.log('✅ Transaction updated successfully:', updateData);
 
       // Update wallet balance for deposits and withdrawals
       if (transaction.transaction_type === 'deposit' || transaction.transaction_type === 'withdraw') {
-        console.log('Updating wallet balance for approved transaction');
+        console.log('💰 Updating wallet balance for approved transaction');
         
         // Use standardized database function to sync wallet balance
         const { data: syncedBalance, error: balanceError } = await supabase.rpc('sync_wallet_balance', {
           p_wallet_id: transaction.wallet_id
         });
 
-        console.log('Synced wallet balance:', syncedBalance);
+        console.log('📊 Synced wallet balance:', syncedBalance);
 
         if (balanceError) {
-          console.error('Error syncing wallet balance:', balanceError);
-          throw balanceError;
+          console.error('❌ Error syncing wallet balance:', balanceError);
+          throw new Error(`Wallet sync failed: ${balanceError.message}`);
         }
 
-        console.log('Wallet balance updated successfully to:', syncedBalance);
+        console.log('✅ Wallet balance updated successfully to:', syncedBalance);
       }
 
       toast.success('Transaction approved successfully');
       onClose();
       onApprovalComplete();
     } catch (error: any) {
-      console.error('Error approving transaction:', error);
-      toast.error('Failed to approve transaction');
+      console.error('❌ Error approving transaction:', {
+        error,
+        message: error.message,
+        details: error
+      });
+      toast.error(`Failed to approve transaction: ${error.message}`);
     } finally {
       setProcessing(false);
     }
@@ -211,12 +227,16 @@ const TransactionApprovalModal: React.FC<TransactionApprovalModalProps> = ({
 
     setProcessing(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('❌ Auth error:', authError);
+        throw new Error('Not authenticated');
+      }
 
-      console.log('Rejecting transaction:', transaction.id);
+      console.log('✅ User authenticated:', user.id);
+      console.log('🔄 Rejecting transaction:', transaction.id);
 
-      const { error: transactionError } = await supabase
+      const { data: updateData, error: transactionError } = await supabase
         .from('transactions')
         .update({
           approval_status: 'rejected',
@@ -224,20 +244,32 @@ const TransactionApprovalModal: React.FC<TransactionApprovalModalProps> = ({
           approved_by: user.id,
           approved_at: new Date().toISOString()
         })
-        .eq('id', transaction.id);
+        .eq('id', transaction.id)
+        .select();
+
+      console.log('📊 Update response:', { data: updateData, error: transactionError });
 
       if (transactionError) {
-        console.error('Error updating transaction:', transactionError);
-        throw transactionError;
+        console.error('❌ Error updating transaction:', transactionError);
+        throw new Error(`Database update failed: ${transactionError.message} (${transactionError.code})`);
       }
 
-      console.log('Transaction rejected successfully');
+      if (!updateData || updateData.length === 0) {
+        console.error('⚠️ No rows updated - possible RLS policy issue');
+        throw new Error('Transaction update failed - insufficient permissions or transaction not found');
+      }
+
+      console.log('✅ Transaction rejected successfully:', updateData);
 
       toast.success('Transaction rejected');
       onClose();
       onApprovalComplete();
     } catch (error: any) {
-      console.error('Error rejecting transaction:', error);
+      console.error('❌ Error rejecting transaction:', {
+        error,
+        message: error.message,
+        details: error
+      });
       toast.error('Failed to reject transaction');
     } finally {
       setProcessing(false);

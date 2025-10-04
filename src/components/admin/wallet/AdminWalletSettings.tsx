@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Settings, DollarSign, Bell, Shield, Globe, Sliders, CreditCard, Building2 } from 'lucide-react';
 import EditableTransactionFeesManager from './EditableTransactionFeesManager';
 import EditableAllocationRulesManager from './EditableAllocationRulesManager';
-import CurrencyManager from './CurrencyManager';
+import LiveCurrencyManager from '../shares/LiveCurrencyManager';
 import AdminSubWalletManagement from './AdminSubWalletManagement';
 import UserWalletLimitsManager from './UserWalletLimitsManager';
 import SecuritySettings from './SecuritySettings';
@@ -85,7 +85,7 @@ const AdminWalletSettings: React.FC<AdminWalletSettingsProps> = ({ onUpdate }) =
             </TabsContent>
 
             <TabsContent value="currencies" className="space-y-4">
-              <CurrencyManager />
+              <LiveCurrencyManager />
             </TabsContent>
 
             <TabsContent value="admin-wallets" className="space-y-4">

@@ -81,6 +81,8 @@ import Contact from "./pages/Contact";
 import MediaGalleryPage from "./pages/MediaGalleryPage";
 import AdminMedia from "./pages/AdminMedia";
 import AdminChatbot from "./pages/AdminChatbot";
+import { AdminAgentChats } from "./pages/AdminAgentChats";
+import AdminDialogflowSettings from "./pages/AdminDialogflowSettings";
 import InvestmentClub from "./pages/InvestmentClub";
 import UserJourneyDemo from "./pages/UserJourneyDemo";
 import DeveloperMenu from "./pages/developer/DeveloperMenu";
@@ -95,6 +97,7 @@ import ExpressRegistration from "./components/auth/ExpressRegistration";
 import RegistrationTypeSelector from "./components/auth/RegistrationTypeSelector";
 import RegistrationSuccessExpress from "./pages/RegistrationSuccessExpress";
 import RelWorxTest from "./pages/RelWorxTest";
+import { AdminFloatingChatWidget } from "./components/admin/AdminFloatingChatWidget";
 
 const queryClient = new QueryClient();
 
@@ -284,6 +287,8 @@ function App() {
                    <Route path="/admin/settings" element={<AdminGuard><ProtectedRoute adminOnly={true}><AdminSettings /></ProtectedRoute></AdminGuard>} />
                    <Route path="/admin/media" element={<AdminGuard><ProtectedRoute adminOnly={true}><AdminMedia /></ProtectedRoute></AdminGuard>} />
                    <Route path="/admin/chatbot" element={<AdminGuard><ProtectedRoute adminOnly={true}><AdminChatbot /></ProtectedRoute></AdminGuard>} />
+                   <Route path="/admin/agent-chats" element={<AdminGuard><ProtectedRoute adminOnly={true}><AdminAgentChats /></ProtectedRoute></AdminGuard>} />
+                   <Route path="/admin/dialogflow-settings" element={<AdminGuard><ProtectedRoute adminOnly={true}><AdminDialogflowSettings /></ProtectedRoute></AdminGuard>} />
                    
                     {/* Media Gallery Page */}
                     <Route path="/media" element={<MediaGalleryPage />} />
@@ -311,6 +316,7 @@ function App() {
                      <ChatbotInitializer />
                      <MobileBottomNavigation />
                      <QuickActionsFAB />
+                     <AdminFloatingChatWidget />
                 </AdminUserProvider>
               </UserProvider>
             </AuthProvider>

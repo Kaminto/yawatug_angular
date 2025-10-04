@@ -31,10 +31,13 @@ const UserSellQueueDashboard: React.FC<UserSellQueueDashboardProps> = ({ userId 
 
   const loadQueueData = async () => {
     try {
-      // Load user's orders from the new table
+      // Load user's orders from the new table with shares join
       const { data: orders, error: ordersError } = await supabase
         .from('share_sell_orders')
-        .select('id, user_id, share_id, quantity, remaining_quantity, processed_quantity, requested_price, status, fifo_position, created_at, total_sell_value')
+        .select(`
+          *,
+          shares(name, price_per_share, currency)
+        `)
         .eq('user_id', userId)
         .order('fifo_position', { ascending: true });
 

@@ -112,6 +112,46 @@ const EnhancedProfileManager: React.FC<EnhancedProfileManagerProps> = ({
         updated_at: new Date().toISOString()
       };
 
+      // Handle email update for temporary emails
+      const isTempEmail = profile?.email?.includes('@yawatu.app');
+      if (isTempEmail && formData.email && formData.email !== profile.email) {
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+          toast.error('Please enter a valid email address');
+          return;
+        }
+
+        // Check if email already exists
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', formData.email)
+          .neq('id', targetUserId)
+          .single();
+
+        if (existingProfile) {
+          toast.error('This email is already in use');
+          return;
+        }
+
+        // Update email in profile
+        Object.assign(updateData, { email: formData.email });
+
+        // Update auth email
+        const { error: authError } = await supabase.auth.updateUser({
+          email: formData.email
+        });
+
+        if (authError) {
+          toast.error('Failed to update email in authentication system');
+          console.error('Auth email update error:', authError);
+          return;
+        }
+
+        toast.success('Email verification sent to your new email address');
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update(updateData)
@@ -288,8 +328,19 @@ const EnhancedProfileManager: React.FC<EnhancedProfileManagerProps> = ({
                   />
                 </div>
                 <div>
-                  <Label>Email</Label>
-                  <Input value={formData.email || ''} disabled />
+                  <Label>Email {profile?.email?.includes('@yawatu.app') && <span className="text-xs text-muted-foreground">(Temporary - Please update)</span>}</Label>
+                  <Input 
+                    value={formData.email || ''} 
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    disabled={!editing || !profile?.email?.includes('@yawatu.app')}
+                    type="email"
+                    placeholder="Enter your email address"
+                  />
+                  {profile?.email?.includes('@yawatu.app') && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Add your real email address to receive important notifications
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label>Phone</Label>

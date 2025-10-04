@@ -6,10 +6,10 @@ const corsHeaders = {
 }
 
 interface ExchangeRequest {
+  userId: string;
   fromCurrency: string;
   toCurrency: string;
-  amount: number;
-  exchangeRate: number;
+  fromAmount: number;
   description?: string;
 }
 
@@ -36,9 +36,9 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Invalid authorization')
     }
 
-    const { fromCurrency, toCurrency, amount, exchangeRate, description }: ExchangeRequest = await req.json()
+    const { userId, fromCurrency, toCurrency, fromAmount, description }: ExchangeRequest = await req.json()
 
-    if (!amount || amount <= 0) {
+    if (!fromAmount || fromAmount <= 0) {
       throw new Error('Valid amount is required')
     }
 
@@ -46,11 +46,23 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Both currencies are required')
     }
 
-    if (!exchangeRate || exchangeRate <= 0) {
-      throw new Error('Valid exchange rate is required')
+    console.log('Processing exchange for user:', user.id, { fromCurrency, toCurrency, amount: fromAmount })
+
+    // Get exchange rate from database
+    const { data: rateData, error: rateError } = await supabase
+      .from('exchange_rates')
+      .select('rate, spread_percentage')
+      .eq('from_currency', fromCurrency)
+      .eq('to_currency', toCurrency)
+      .eq('is_active', true)
+      .single()
+
+    if (rateError || !rateData) {
+      throw new Error(`Exchange rate not available for ${fromCurrency} to ${toCurrency}`)
     }
 
-    console.log('Processing exchange for user:', user.id, { fromCurrency, toCurrency, amount, exchangeRate })
+    const exchangeRate = rateData.rate
+    const spreadPercentage = rateData.spread_percentage || 0
 
     // Get wallet IDs
     const { data: sourceWallet, error: sourceWalletError } = await supabase
@@ -87,7 +99,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Calculate fee
     let feeAmount = 0
     if (feeSettings) {
-      const percentageFee = (amount * (feeSettings.percentage_fee || 0)) / 100
+      const percentageFee = (fromAmount * (feeSettings.percentage_fee || 0)) / 100
       const flatFee = feeSettings.flat_fee || 0
       feeAmount = percentageFee + flatFee
       
@@ -99,14 +111,17 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    const convertedAmount = amount * exchangeRate
+    // Calculate converted amount with spread
+    const baseConvertedAmount = fromAmount * exchangeRate
+    const spreadAmount = baseConvertedAmount * (spreadPercentage / 100)
+    const convertedAmount = baseConvertedAmount - spreadAmount
 
     // Use database function that validates balance and creates transactions atomically
     const { data: exchangeResult, error: exchangeError } = await supabase.rpc('create_exchange_transaction', {
       p_user_id: user.id,
       p_from_wallet_id: sourceWallet.id,
       p_to_wallet_id: destWallet.id,
-      p_from_amount: amount,
+      p_from_amount: fromAmount,
       p_to_amount: convertedAmount,
       p_from_currency: fromCurrency,
       p_to_currency: toCurrency,
@@ -128,10 +143,13 @@ const handler = async (req: Request): Promise<Response> => {
         transaction: {
           debit_id: exchangeResult.debit_transaction_id,
           credit_id: exchangeResult.credit_transaction_id,
-          amount,
+          amount: fromAmount,
           fee_amount: feeAmount,
-          total_deducted: amount + feeAmount,
+          total_deducted: fromAmount + feeAmount,
           converted_amount: convertedAmount,
+          base_converted_amount: baseConvertedAmount,
+          spread_amount: spreadAmount,
+          spread_percentage: spreadPercentage,
           from_currency: fromCurrency,
           to_currency: toCurrency,
           exchange_rate: exchangeRate,

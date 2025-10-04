@@ -9,6 +9,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import PasswordStrengthChecker from "@/components/auth/PasswordStrengthChecker";
+import { Eye, EyeOff, Check, X } from "lucide-react";
 
 const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState("");
@@ -16,8 +17,19 @@ const ResetPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isValidToken, setIsValidToken] = useState(false);
   const [isCheckingToken, setIsCheckingToken] = useState(true);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // Password validation checks
+  const passwordChecks = {
+    length: newPassword.length >= 8,
+    uppercase: /[A-Z]/.test(newPassword),
+    lowercase: /[a-z]/.test(newPassword),
+    number: /[0-9]/.test(newPassword),
+    special: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword),
+  };
 
   useEffect(() => {
     const checkResetToken = async () => {
@@ -138,7 +150,7 @@ const ResetPassword = () => {
               action: 'activate',
               email: activationEmail,
               password: newPassword,
-              activation_token: activationToken
+              token: activationToken
             }
           });
 
@@ -268,34 +280,110 @@ const ResetPassword = () => {
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
                 <Label htmlFor="newPassword">New Password</Label>
-                <Input 
-                  id="newPassword" 
-                  type="password" 
-                  className="bg-white/50 dark:bg-black/50 border-gray-300 dark:border-yawatu-gold/30 focus:border-yawatu-gold" 
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  placeholder="Enter your new password"
-                />
+                <div className="relative">
+                  <Input 
+                    id="newPassword" 
+                    type={showNewPassword ? "text" : "password"}
+                    className="bg-white/50 dark:bg-black/50 border-gray-300 dark:border-yawatu-gold/30 focus:border-yawatu-gold pr-10" 
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    placeholder="Enter your new password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
 
               {newPassword && (
-                <PasswordStrengthChecker password={newPassword} />
+                <div className="space-y-3">
+                  <PasswordStrengthChecker password={newPassword} />
+                  
+                  <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg space-y-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password must contain:</p>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 text-sm">
+                        {passwordChecks.length ? (
+                          <Check size={16} className="text-green-600 dark:text-green-400" />
+                        ) : (
+                          <X size={16} className="text-red-600 dark:text-red-400" />
+                        )}
+                        <span className={passwordChecks.length ? "text-green-600 dark:text-green-400" : "text-gray-600 dark:text-gray-400"}>
+                          At least 8 characters
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        {passwordChecks.uppercase ? (
+                          <Check size={16} className="text-green-600 dark:text-green-400" />
+                        ) : (
+                          <X size={16} className="text-red-600 dark:text-red-400" />
+                        )}
+                        <span className={passwordChecks.uppercase ? "text-green-600 dark:text-green-400" : "text-gray-600 dark:text-gray-400"}>
+                          One uppercase letter
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        {passwordChecks.lowercase ? (
+                          <Check size={16} className="text-green-600 dark:text-green-400" />
+                        ) : (
+                          <X size={16} className="text-red-600 dark:text-red-400" />
+                        )}
+                        <span className={passwordChecks.lowercase ? "text-green-600 dark:text-green-400" : "text-gray-600 dark:text-gray-400"}>
+                          One lowercase letter
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        {passwordChecks.number ? (
+                          <Check size={16} className="text-green-600 dark:text-green-400" />
+                        ) : (
+                          <X size={16} className="text-red-600 dark:text-red-400" />
+                        )}
+                        <span className={passwordChecks.number ? "text-green-600 dark:text-green-400" : "text-gray-600 dark:text-gray-400"}>
+                          One number
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        {passwordChecks.special ? (
+                          <Check size={16} className="text-green-600 dark:text-green-400" />
+                        ) : (
+                          <X size={16} className="text-red-600 dark:text-red-400" />
+                        )}
+                        <span className={passwordChecks.special ? "text-green-600 dark:text-green-400" : "text-gray-600 dark:text-gray-400"}>
+                          One special character (!@#$%^&*...)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
 
               <div>
                 <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input 
-                  id="confirmPassword" 
-                  type="password" 
-                  className="bg-white/50 dark:bg-black/50 border-gray-300 dark:border-yawatu-gold/30 focus:border-yawatu-gold" 
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  placeholder="Confirm your new password"
-                />
+                <div className="relative">
+                  <Input 
+                    id="confirmPassword" 
+                    type={showConfirmPassword ? "text" : "password"}
+                    className="bg-white/50 dark:bg-black/50 border-gray-300 dark:border-yawatu-gold/30 focus:border-yawatu-gold pr-10" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    placeholder="Confirm your new password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
 
               {confirmPassword && newPassword !== confirmPassword && (

@@ -138,19 +138,28 @@ Admin Commands Available:
         supabase.from('transactions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(5)
       ]);
 
-      dataContext = `User Account Data:
+      const totalSharesCount = userShares.data?.reduce((sum: number, us: any) => sum + (us.quantity || 0), 0) || 0;
+      const estimatedShareValue = totalSharesCount * 20000; // Current share price UGX 20,000
+
+      dataContext = `User Account Data (LIFETIME OWNER):
 - Profile Status: ${userProfile.data?.status || 'unknown'}
 - Account Type: ${userProfile.data?.account_type || 'standard'}
 - Verification Status: ${userProfile.data?.profile_completion_percentage || 0}% complete
 - Wallet Balance: UGX ${userWallet.data?.balance?.toLocaleString() || '0'}
-- Total Shares Owned: ${userShares.data?.length || 0}
+- Total Shares Owned: ${totalSharesCount} shares (Est. value: UGX ${estimatedShareValue.toLocaleString()})
+- Share Holdings: ${userShares.data?.length || 0} different share types
 - Recent Transactions: ${recentTransactions.data?.length || 0}
 
+💎 OWNERSHIP STATUS: This user is a LIFETIME CO-OWNER of Yawatu! They earn dividends forever.
+
 Available Actions:
-- "check my balance" - Show current wallet balance
-- "account verification status" - Check verification progress
-- "how to buy shares" - Guide for purchasing shares
+- "check my balance" - Show current wallet balance and share value
+- "my shares" - View all share holdings and estimated value
+- "referral earnings" - Check 5% lifetime commission from referrals
+- "buy more shares" - Purchase additional shares from Dynamic Share Pool
+- "account verification" - Complete verification for full access
 - "recent transactions" - Show transaction history
+- "dividend history" - View lifetime dividend earnings
 `;
     }
 

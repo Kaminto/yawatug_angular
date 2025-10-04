@@ -32,6 +32,7 @@ interface DashboardMetrics {
   activeVotings: number;
   pendingApprovals: number;
   monthlyRevenue: number;
+  pendingChats: number;
 }
 
 const AdminDashboard = () => {
@@ -43,7 +44,8 @@ const AdminDashboard = () => {
     systemHealth: 98,
     activeVotings: 0,
     pendingApprovals: 0,
-    monthlyRevenue: 0
+    monthlyRevenue: 0,
+    pendingChats: 0
   });
   const [loading, setLoading] = useState(true);
   const [recentActivities, setRecentActivities] = useState([]);
@@ -62,14 +64,16 @@ const AdminDashboard = () => {
         walletsResult,
         transactionsResult,
         votingsResult,
-        approvalsResult
+        approvalsResult,
+        chatsResult
       ] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact' }),
         supabase.from('profiles').select('id', { count: 'exact' }).eq('status', 'pending_verification'),
         supabase.from('admin_sub_wallets').select('balance, currency'),
         supabase.from('transactions').select('amount, created_at').gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
         supabase.from('voting_proposals').select('id', { count: 'exact' }).eq('status', 'active'),
-        supabase.from('transactions').select('id', { count: 'exact' }).eq('approval_status', 'pending')
+        supabase.from('transactions').select('id', { count: 'exact' }).eq('approval_status', 'pending'),
+        supabase.from('chatbot_conversations').select('id', { count: 'exact' }).eq('escalated_to_human', true).is('resolved', false)
       ]);
 
       // Calculate total balance across all admin wallets
@@ -89,7 +93,8 @@ const AdminDashboard = () => {
         systemHealth: 98, // This would be calculated from actual system metrics
         activeVotings: votingsResult.count || 0,
         pendingApprovals: approvalsResult.count || 0,
-        monthlyRevenue: dailyVolume * 30 // Estimate based on daily volume
+        monthlyRevenue: dailyVolume * 30, // Estimate based on daily volume
+        pendingChats: chatsResult.count || 0
       });
 
       // Load recent activities
@@ -144,9 +149,9 @@ const AdminDashboard = () => {
 
   const quickActions = [
     { label: 'Verify Users', href: '/admin/verification', icon: CheckCircle, count: metrics.pendingVerifications },
+    { label: 'Agent Chats', href: '/admin/agent-chats', icon: MessageSquare, count: metrics.pendingChats },
     { label: 'Approve Transactions', href: '/admin/wallet-approvals', icon: DollarSign, count: metrics.pendingApprovals },
-    { label: 'Monitor System', href: '/admin/system-health', icon: Activity, count: 0 },
-    { label: 'Manage Voting', href: '/admin/voting', icon: BarChart3, count: metrics.activeVotings }
+    { label: 'Monitor System', href: '/admin/system-health', icon: Activity, count: 0 }
   ];
 
   if (loading) {

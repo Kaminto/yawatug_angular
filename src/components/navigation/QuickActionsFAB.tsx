@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { MessageCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EnhancedChatBot } from '@/components/chat/EnhancedChatBot';
+import { SimpleChatBot } from '@/components/chat/SimpleChatBot';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminUser } from '@/contexts/AdminUserContext';
 
@@ -21,11 +22,6 @@ export const QuickActionsFAB: React.FC<YawatuAssistantFABProps> = ({
   const handleToggleChat = () => {
     setIsChatOpen(!isChatOpen);
   };
-
-  // Only show if user is logged in
-  if (!user) {
-    return null;
-  }
 
   return (
     <>
@@ -56,9 +52,15 @@ export const QuickActionsFAB: React.FC<YawatuAssistantFABProps> = ({
         </Button>
       </div>
 
-      {/* Enhanced ChatBot - Fixed positioning for responsive design */}
-      {isChatOpen && (
-        <div className="fixed inset-0 z-[50] bg-black/20 backdrop-blur-sm sm:inset-4 sm:rounded-lg sm:shadow-2xl overflow-hidden">
+      {/* Chatbot - Simple for visitors, Enhanced for logged-in users (both floating) */}
+      {isChatOpen && !user && (
+        <div className="fixed bottom-36 right-4 z-[50] w-[calc(100vw-2rem)] max-w-md sm:bottom-24 sm:right-6 animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <SimpleChatBot onClose={() => setIsChatOpen(false)} />
+        </div>
+      )}
+      
+      {isChatOpen && user && (
+        <div className="fixed inset-0 z-[50] bg-black/20 backdrop-blur-sm sm:inset-4 sm:rounded-lg sm:shadow-2xl overflow-hidden animate-in fade-in duration-300">
           <div className="h-full w-full bg-background sm:rounded-lg">
             <EnhancedChatBot
               userRole={originalAdmin ? 'admin' : 'user'}

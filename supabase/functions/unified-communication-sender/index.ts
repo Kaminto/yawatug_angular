@@ -316,7 +316,13 @@ const handler = async (req: Request): Promise<Response> => {
         console.log('📱 Sending SMS to:', smsRecipients);
         console.log('📱 SMS message:', smsMessage);
         
+        // Get authorization header from incoming request
+        const authHeader = req.headers.get('authorization');
+        
         const smsResult = await supabase.functions.invoke('send-sms', {
+          headers: {
+            Authorization: authHeader || `Bearer ${supabaseServiceKey}`
+          },
           body: {
             phoneNumber: smsRecipients,
             message: smsMessage,

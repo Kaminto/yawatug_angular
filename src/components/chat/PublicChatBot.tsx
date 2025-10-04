@@ -41,11 +41,11 @@ export const PublicChatBot: React.FC<PublicChatBotProps> = ({ onClose }) => {
     stop: stopSpeaking,
   } = useEnhancedTextToSpeech();
 
-  // Welcome message for potential investors
+  // Welcome message for potential investors - emphasizing LIFETIME OWNERSHIP
   useEffect(() => {
     const welcomeMsg: Message = {
       role: 'assistant',
-      content: "Hello and welcome to Yawatu Minerals! I'm your personal investment assistant. Did you know you can start investing in Uganda's mining sector for just 200,000 shillings? That's only 10 shares at 20,000 shillings each! Plus, earn 5% commission when you refer friends. Ask me anything about getting started, payment methods, or our referral program!",
+      content: "Welcome to Yawatu Minerals & Mining! 🌟 I'm here to help you become a LIFETIME OWNER of Uganda's mining wealth! When you invest with us, you don't just buy shares - you become a permanent co-owner who earns dividends for life. Start with just UGX 200,000 (10 shares) and join thousands building generational wealth. Plus, earn 5% commission on EVERY referral forever! Ready to own your future? 💎",
       timestamp: new Date(),
     };
     setMessages([welcomeMsg]);
@@ -74,17 +74,45 @@ export const PublicChatBot: React.FC<PublicChatBotProps> = ({ onClose }) => {
     setIsLoading(true);
 
     try {
-      const systemContext = `You are Yawatu Assistant, a helpful AI for Yawatu Minerals & Mining PLC - Uganda's premier mining investment platform.
+      const systemContext = `You are Yawatu Assistant for Yawatu Minerals & Mining PLC - Uganda's premier mining investment platform.
 
-Key Information:
-- Share Investment: Current share price UGX 20,000. Minimum 10 shares, maximum 10,000 shares.
-- Payment Options: MTN Mobile Money, Airtel Money, M-Pesa, or Bank Transfer. Full payment or installments available (25% down payment, 30 days to complete).
-- Referral Program: Earn 5% commission on every share purchase or booking made by people you refer! Build your income by inviting friends and family.
-- Booking System: Reserve shares with down payment, complete payment in installments.
-- Account Types: Individual, Joint, Company, and Minor accounts supported.
-- Wallet System: Manage funds in UGX and USD wallets, deposit/withdraw easily.
+🌟 CRITICAL MESSAGE: When someone invests in Yawatu, they become LIFETIME OWNERS, not just investors. They own part of the company FOREVER and earn dividends for as long as Yawatu operates. This is generational wealth building!
 
-Be friendly, encouraging, and focus on helping potential investors understand the opportunity. Mention the referral earnings prominently!`;
+Current Investment Details (2025):
+- Share Price: UGX 20,000 per share (current price)
+- Minimum Investment: 10 shares = UGX 200,000 total
+- No maximum limit - buy as many shares as you want
+- Dynamic Share Pool: No batches, buy anytime directly from our share pool
+
+Payment Options:
+- MTN Mobile Money, Airtel Money, M-Pesa, Bank Transfer
+- Full payment OR flexible installment plans
+- Installments: 25% down payment, remaining balance within 30 days
+- Booking system: Reserve shares with down payment, pay over time
+
+💰 LIFETIME REFERRAL INCOME:
+- Earn 5% commission on EVERY share purchase by your referrals
+- Earn 5% on ALL bookings made by people you refer
+- Commission paid for the LIFETIME of your referrals' activity
+- Build passive income by growing your referral network
+- Track all earnings in real-time
+
+Account & Wallet Features:
+- Account types: Individual, Joint, Company, Minor accounts
+- Multi-currency wallets: UGX and USD
+- Deposit/withdraw easily via mobile money or bank
+- Transfer funds between users instantly
+- Secure wallet management
+
+Share Trading:
+- Buy directly from Dynamic Share Pool (always available)
+- Sell back when company buyback funds are available
+- Transfer shares to other users instantly
+- All digital - no paperwork needed
+
+EMPHASIZE: Ownership is permanent. Dividends are lifetime income. Referral commissions are passive income forever. This is about building wealth that lasts generations!
+
+Be enthusiastic, use emojis, focus on LIFETIME OWNERSHIP, and encourage them to start their wealth journey today! 🚀`;
 
       const { data, error } = await supabase.functions.invoke('chat-with-ai', {
         body: {

@@ -5,12 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// SimpleLes API Configuration
-const SIMPLELES_WITHDRAW_URL = "http://payments.simpleles.net:5056/api/wallet/mm-withdraw";
-const SIMPLELES_BALANCE_URL = "http://payments.simpleles.net:5056/api/wallet/mm-balance";
-const SIMPLELES_API_KEY = "YW.dByWxeGfQHqVV6309MHtJQ-dId9UPVsR-TIop7RuYrmA9RIL";
-const SIMPLELES_ACCOUNT_NO = "YEW2024A25E4R";
-
 interface WithdrawalRequest {
   amount: number;
   currency: string;
@@ -151,97 +145,36 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Phone number required for mobile money withdrawal')
     }
 
-    // First, check SimpleLes wallet balance
-    console.log('Checking SimpleLes wallet balance before withdrawal...')
+    // Use SimpleLes Gateway for withdrawal processing
+    console.log('Processing withdrawal via SimpleLes Gateway:', { phoneNumber: msisdn, amount, currency })
     
     try {
-      const balanceResponse = await fetch(`${SIMPLELES_BALANCE_URL}?account_no=${SIMPLELES_ACCOUNT_NO}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${SIMPLELES_API_KEY}`
-        }
-      })
-
-      const balanceData = await balanceResponse.json()
-      console.log('SimpleLes Balance Check Response:', {
-        status: balanceResponse.status,
-        data: balanceData
-      })
-
-      // Log available balance for debugging
-      if (balanceData && balanceData.balance !== undefined) {
-        console.log(`SimpleLes Available Balance: ${balanceData.balance} ${currency}`)
-        console.log(`Withdrawal Amount: ${amount} ${currency}`)
-        
-        if (parseFloat(balanceData.balance) < amount) {
-          console.error(`Insufficient SimpleLes balance: ${balanceData.balance} < ${amount}`)
-          
-          // Update transaction to failed
-          await supabase
-            .from('transactions')
-            .update({ 
-              status: 'failed',
-              admin_notes: `Insufficient SimpleLes wallet balance. Available: ${balanceData.balance}, Required: ${amount}`
-            })
-            .eq('id', transaction.id)
-          
-          // Return a 200 with structured error so the client doesn't see a generic non-2xx
-          return new Response(
-            JSON.stringify({
-              success: false,
-              code: 'provider_insufficient_balance',
-              message: 'Payment provider has insufficient balance. Please contact support.',
-              providerBalance: balanceData.balance,
-              requestedAmount: amount,
-              currency
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-          )
-        }
-      }
-    } catch (balanceError: any) {
-      console.error('Error checking SimpleLes balance:', balanceError)
-      // Continue with withdrawal attempt even if balance check fails
-      console.log('Proceeding with withdrawal despite balance check error...')
-    }
-
-    // Call SimpleLes API to process the withdrawal
-    console.log('Calling SimpleLes API for withdrawal:', { phoneNumber: msisdn, amount, currency })
-    
-    const simplesPayload = {
-      account_no: SIMPLELES_ACCOUNT_NO,
-      reference: transaction.reference,
-      msisdn: msisdn,
-      currency: currency,
-      amount: amount.toString(),
-      description: description || 'Withdrawal request'
-    }
-
-    try {
-      const simplesResponse = await fetch(SIMPLELES_WITHDRAW_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${SIMPLELES_API_KEY}`
+      // Call the simpleles-gateway function
+      const gatewayResponse = await supabase.functions.invoke('simpleles-gateway', {
+        body: {
+          operation: 'withdraw',
+          amount,
+          currency,
+          phoneNumber: msisdn,
+          reference: transaction.reference,
+          description: description || 'Withdrawal request',
+          transactionId: transaction.id
         },
-        body: JSON.stringify(simplesPayload)
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       })
 
-      const simplesData = await simplesResponse.json()
-      console.log('SimpleLes API response:', simplesData)
+      console.log('SimpleLes Gateway response:', gatewayResponse)
 
-      if (simplesResponse.ok && simplesData.status === 'success') {
-        // Update transaction to processing/completed
-        await supabase
-          .from('transactions')
-          .update({ 
-            status: 'processing',
-            gateway_reference: simplesData.reference || simplesData.transaction_id,
-            metadata: { ...transaction.metadata, simples_response: simplesData }
-          })
-          .eq('id', transaction.id)
+      if (gatewayResponse.error) {
+        throw new Error(gatewayResponse.error.message || 'Gateway request failed')
+      }
 
+      const gatewayData = gatewayResponse.data
+
+      if (gatewayData?.success) {
+        // Gateway and SimpleLes both succeeded
         return new Response(
           JSON.stringify({
             success: true,
@@ -265,20 +198,14 @@ const handler = async (req: Request): Promise<Response> => {
           }
         )
       } else {
-        // SimpleLes API failed
-        console.error('SimpleLes API error:', simplesData)
-        await supabase
-          .from('transactions')
-          .update({ 
-            status: 'failed',
-            admin_notes: JSON.stringify(simplesData)
-          })
-          .eq('id', transaction.id)
-
-        throw new Error(simplesData.message || 'Failed to process withdrawal with mobile money provider')
+        // Gateway call succeeded but SimpleLes reported failure
+        const errorMessage = gatewayData?.data?.message || 'Failed to process withdrawal with mobile money provider'
+        console.error('SimpleLes API error:', gatewayData)
+        
+        throw new Error(errorMessage)
       }
     } catch (apiError: any) {
-      console.error('Error calling SimpleLes API:', apiError)
+      console.error('Error calling SimpleLes Gateway:', apiError)
       
       // Update transaction to failed
       await supabase
@@ -289,7 +216,7 @@ const handler = async (req: Request): Promise<Response> => {
         })
         .eq('id', transaction.id)
 
-      throw new Error('Failed to connect to mobile money provider: ' + apiError.message)
+      throw new Error('Failed to process withdrawal: ' + apiError.message)
     }
 
   } catch (error: any) {

@@ -61,7 +61,7 @@ export const useReferralCommissions = (userId: string) => {
           .from('referral_commissions')
           .select(`
             *,
-            referred_profile:profiles!referred_id (
+            referred_profile:profiles!referral_commissions_referred_id_fkey (
               full_name,
               email
             )
@@ -78,22 +78,31 @@ export const useReferralCommissions = (userId: string) => {
         setCommissions(commissionData);
 
         // Calculate enhanced earnings breakdown
+        // EARNED: All paid commissions (direct purchases + installment payments that are paid)
         const directPurchases = commissionData.filter(c => 
           c.commission_type === 'direct_purchase' && c.status === 'paid'
         );
         
         const installmentPayments = commissionData.filter(c => 
-          c.commission_type === 'installment_payment' && c.status === 'paid'
+          (c.commission_type === 'installment_payment' || c.is_from_installment === true) && c.status === 'paid'
         );
         
+        // EXPECTED: All pending commissions (bookings + unpaid installments)
         const expectedFromBookings = commissionData.filter(c => 
-          c.commission_type === 'expected_installment' && c.status === 'pending'
+          (c.commission_type === 'expected_installment' || c.commission_type === 'booking') && c.status === 'pending'
+        );
+        
+        const expectedFromUnpaidInstallments = commissionData.filter(c => 
+          (c.commission_type === 'installment_payment' || c.is_from_installment === true) && c.status === 'pending'
         );
 
         const directEarned = directPurchases.reduce((sum, c) => sum + (c.commission_amount || 0), 0);
         const installmentEarned = installmentPayments.reduce((sum, c) => sum + (c.commission_amount || 0), 0);
         const totalEarned = directEarned + installmentEarned;
-        const totalExpected = expectedFromBookings.reduce((sum, c) => sum + (c.commission_amount || 0), 0);
+        
+        const bookingExpected = expectedFromBookings.reduce((sum, c) => sum + (c.commission_amount || 0), 0);
+        const unpaidInstallmentExpected = expectedFromUnpaidInstallments.reduce((sum, c) => sum + (c.commission_amount || 0), 0);
+        const totalExpected = bookingExpected + unpaidInstallmentExpected;
 
         setEnhancedEarnings({
           totalEarned,
@@ -103,7 +112,7 @@ export const useReferralCommissions = (userId: string) => {
           breakdown: {
             directPurchases,
             installmentPayments,
-            expectedFromBookings
+            expectedFromBookings: [...expectedFromBookings, ...expectedFromUnpaidInstallments]
           }
         });
 

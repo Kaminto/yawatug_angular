@@ -1,226 +1,178 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Mail, Shield, FileText, ArrowRight, Calendar, Gift } from 'lucide-react';
+import { CheckCircle, TrendingUp, Share, Gift, ArrowRight, Hash } from 'lucide-react';
 
-interface NextStep {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  action: string;
-  priority: 'high' | 'medium' | 'low';
+interface RegistrationSuccessProps {
+  registrationNumber: string;
+  registrationMethod: 'email' | 'phone';
+  email?: string;
+  phone?: string;
+  variant?: 'modal' | 'page';
+  onClose?: () => void;
 }
 
-const RegistrationSuccess: React.FC = () => {
+export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({
+  registrationNumber,
+  registrationMethod,
+  email,
+  phone,
+  variant = 'page',
+  onClose
+}) => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const isWelcomeFlow = searchParams.get('welcome') === 'true';
-  const [currentStep, setCurrentStep] = useState(0);
 
-  const nextSteps: NextStep[] = [
-    {
-      icon: <Mail className="h-5 w-5" />,
-      title: 'Verify Your Email',
-      description: 'Check your inbox and click the verification link to activate your account',
-      action: 'Check Email',
-      priority: 'high'
-    },
-    {
-      icon: <FileText className="h-5 w-5" />,
-      title: 'Complete Your Profile',
-      description: 'Add personal details and upload documents for faster verification',
-      action: 'Complete Profile',
-      priority: 'high'
-    },
-    {
-      icon: <Shield className="h-5 w-5" />,
-      title: 'Set Up Security',
-      description: 'Enable two-factor authentication for enhanced account security',
-      action: 'Setup Security',
-      priority: 'medium'
-    },
-    {
-      icon: <Gift className="h-5 w-5" />,
-      title: 'Explore Features',
-      description: 'Learn about trading, wallet management, and earning rewards',
-      action: 'Take Tour',
-      priority: 'low'
-    }
-  ];
-
-  useEffect(() => {
-    // Auto-advance steps for visual effect
-    const timer = setInterval(() => {
-      setCurrentStep(prev => (prev + 1) % nextSteps.length);
-    }, 3000);
-    
-    return () => clearInterval(timer);
-  }, [nextSteps.length]);
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-500';
-      case 'medium': return 'bg-yellow-500';
-      default: return 'bg-green-500';
-    }
+  const shareReferralWhatsApp = () => {
+    const message = `Join me on YAWATU - Uganda's premier investment platform! Use my referral code ${registrationNumber} to get started: https://yawatug.com/register?ref=${registrationNumber}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
   };
 
-  const handleContinue = () => {
-    if (isWelcomeFlow) {
-      navigate('/profile?welcome=true');
-    } else {
-      navigate('/auth?mode=login');
-    }
-  };
+  const content = (
+    <>
+      <CardHeader className="text-center">
+        <div className="flex justify-center mb-4">
+          <div className="p-3 rounded-full bg-primary/10">
+            <CheckCircle className="h-8 w-8 text-primary" />
+          </div>
+        </div>
+        <CardTitle className="text-xl">Welcome to YAWATU!</CardTitle>
+        <p className="text-muted-foreground">Your account has been created successfully</p>
+        
+        {registrationNumber && (
+          <div className="mt-4 p-4 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/20 rounded-lg">
+            <div className="flex items-center justify-center gap-2 text-primary mb-2">
+              <Hash className="h-5 w-5" />
+              <span className="font-medium">Your Registration Number</span>
+            </div>
+            <div className="text-3xl font-bold text-primary">
+              {registrationNumber}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              You are member #{registrationNumber.replace('YWT', '')} 
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Save this number - it's also your referral code for earning rewards!
+            </p>
+          </div>
+        )}
+      </CardHeader>
+      
+      <CardContent className="space-y-6">
+        {/* Verification Notice */}
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 className="font-medium text-blue-900 mb-1">
+            {registrationMethod === 'email' ? 'Check your email' : 'Verify your phone'}
+          </h4>
+          <p className="text-sm text-blue-700">
+            {registrationMethod === 'email' 
+              ? `We've sent a verification link to ${email || 'your email'}`
+              : `We've sent a verification code to ${phone || 'your phone'}`
+            }
+          </p>
+        </div>
 
-  const handleScheduleReminder = () => {
-    // Create calendar event for profile completion
-    const event = {
-      title: 'Complete YAWATU Profile Setup',
-      details: 'Remember to complete your profile and upload required documents for verification',
-      start: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
-      duration: 30 // 30 minutes
-    };
-    
-    const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&details=${encodeURIComponent(event.details)}`;
-    window.open(calendarUrl, '_blank');
-  };
+        {/* Quick Actions */}
+        <div className="space-y-4">
+          <h4 className="font-medium">Get started in 3 simple steps:</h4>
+          
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 border rounded-lg">
+              <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-medium">1</div>
+              <div className="flex-1">
+                <p className="font-medium text-sm">Verify your {registrationMethod}</p>
+                <p className="text-xs text-muted-foreground">
+                  {registrationMethod === 'email' ? 'Click the link we sent' : 'Enter the code we sent'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3 p-3 border rounded-lg">
+              <div className="w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center font-medium">2</div>
+              <div className="flex-1">
+                <p className="font-medium text-sm">Complete your profile</p>
+                <p className="text-xs text-muted-foreground">Add documents for verification</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3 p-3 border rounded-lg">
+              <div className="w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center font-medium">3</div>
+              <div className="flex-1">
+                <p className="font-medium text-sm">Start investing</p>
+                <p className="text-xs text-muted-foreground">Buy your first shares</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Referral Rewards */}
+        <div className="p-4 bg-gradient-to-r from-secondary/10 to-primary/10 border border-primary/20 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <Gift className="h-4 w-4 text-primary" />
+            <h4 className="font-medium text-primary">Earn Bonus Rewards</h4>
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">
+            Share {registrationNumber} with friends and earn rewards when they invest
+          </p>
+          <Button
+            variant="outline"
+            onClick={shareReferralWhatsApp}
+            className="w-full flex items-center gap-2"
+            size="sm"
+          >
+            <Share className="h-4 w-4" />
+            Share & Earn Now
+          </Button>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          <Button 
+            onClick={() => navigate('/dashboard')}
+            className="w-full h-12 flex items-center gap-2"
+          >
+            <TrendingUp className="h-4 w-4" />
+            Go to Dashboard
+            <ArrowRight className="h-4 w-4 ml-auto" />
+          </Button>
+          
+          {variant === 'modal' && onClose && (
+            <Button 
+              variant="outline"
+              onClick={onClose}
+              className="w-full"
+            >
+              Close
+            </Button>
+          )}
+        </div>
+
+        {/* Support */}
+        <div className="text-center pt-4 border-t">
+          <p className="text-xs text-muted-foreground mb-2">
+            Need help getting started?
+          </p>
+          <Button 
+            variant="link" 
+            className="p-0 h-auto text-sm"
+            onClick={() => window.open('https://wa.me/256700000000', '_blank')}
+          >
+            Contact Support on WhatsApp
+          </Button>
+        </div>
+      </CardContent>
+    </>
+  );
+
+  if (variant === 'modal') {
+    return <Card className="w-full">{content}</Card>;
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/10 px-4">
-      <div className="w-full max-w-2xl">
-        {/* Success Header */}
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="h-10 w-10 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-primary mb-2">Welcome to YAWATU!</h1>
-          <p className="text-lg text-muted-foreground">
-            Your account has been successfully created
-          </p>
-        </div>
-
-        {/* Main Success Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-center">Account Creation Successful</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Success Message */}
-            <div className="text-center p-6 bg-green-50 border border-green-200 rounded-lg">
-              <h3 className="font-semibold text-green-800 mb-2">
-                🎉 Congratulations! Your YAWATU account is ready
-              </h3>
-              <p className="text-green-700 text-sm">
-                We've sent a verification email to your inbox. Please verify your email to get started.
-              </p>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="p-4 bg-primary/5 rounded-lg">
-                <div className="text-2xl font-bold text-primary">0%</div>
-                <div className="text-xs text-muted-foreground">Profile Complete</div>
-              </div>
-              <div className="p-4 bg-secondary/5 rounded-lg">
-                <div className="text-2xl font-bold text-secondary">$0</div>
-                <div className="text-xs text-muted-foreground">Wallet Balance</div>
-              </div>
-              <div className="p-4 bg-accent/5 rounded-lg">
-                <div className="text-2xl font-bold text-accent">0</div>
-                <div className="text-xs text-muted-foreground">Shares Owned</div>
-              </div>
-            </div>
-
-            {/* Next Steps */}
-            <div>
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <ArrowRight className="h-4 w-4" />
-                Your Next Steps
-              </h3>
-              
-              <div className="space-y-3">
-                {nextSteps.map((step, index) => (
-                  <div
-                    key={index}
-                    className={`p-4 border rounded-lg transition-all ${
-                      currentStep === index 
-                        ? 'border-primary bg-primary/5 shadow-sm' 
-                        : 'border-border'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-background border rounded">
-                        {step.icon}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-medium">{step.title}</h4>
-                          <Badge 
-                            variant="outline" 
-                            className={`text-xs ${getPriorityColor(step.priority)} text-white border-0`}
-                          >
-                            {step.priority}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {step.description}
-                        </p>
-                        <Button 
-                          size="sm" 
-                          variant={currentStep === index ? "default" : "outline"}
-                          className="text-xs"
-                        >
-                          {step.action}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="space-y-3 pt-4">
-              <Button onClick={handleContinue} className="w-full" size="lg">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Continue to {isWelcomeFlow ? 'Profile Setup' : 'Login'}
-              </Button>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" onClick={handleScheduleReminder}>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Set Reminder
-                </Button>
-                <Button variant="outline" onClick={() => navigate('/help')}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Get Help
-                </Button>
-              </div>
-            </div>
-
-            {/* Welcome Bonus Banner */}
-            <div className="p-4 bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 rounded-lg text-center">
-              <h4 className="font-semibold text-primary mb-1">🎁 Welcome Bonus</h4>
-              <p className="text-sm text-muted-foreground">
-                Complete your profile within 7 days to unlock your welcome bonus and special offers!
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Footer */}
-        <div className="text-center text-sm text-muted-foreground">
-          <p>
-            Need help? Visit our{' '}
-            <Button variant="link" className="p-0 h-auto" onClick={() => navigate('/help')}>
-              Help Center
-            </Button>
-            {' '}or contact support
-          </p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 px-4">
+      <div className="w-full max-w-md">
+        <Card>{content}</Card>
       </div>
     </div>
   );

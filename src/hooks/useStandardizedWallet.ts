@@ -83,7 +83,7 @@ const lastSyncRef = useRef<number>(0);
       // Ensure standard wallets exist
       await ensureStandardWallets(userId);
 
-      // Get all user wallets (no comprehensive sync to avoid triggering updates)
+      // Get all user wallets
       const { data: userWallets, error: walletsError } = await supabase
         .from('wallets')
         .select('*')
@@ -97,11 +97,23 @@ const lastSyncRef = useRef<number>(0);
       const updatedBalances: WalletBalances = { UGX: 0, USD: 0 };
 
       for (const wallet of userWallets || []) {
-        // Use current wallet balance directly to avoid triggering DB updates
-        const syncedBalance = Number(wallet.balance) || 0;
-        console.log(`📥 ${wallet.currency} wallet balance loaded:`, {
+        // Recalculate balance from completed transactions for accuracy
+        const { data: transactions } = await supabase
+          .from('transactions')
+          .select('amount, status, approval_status')
+          .eq('wallet_id', wallet.id)
+          .or('status.in.(completed,success),approval_status.in.(approved,completed)');
+
+        // Calculate actual balance from transactions
+        const calculatedBalance = transactions?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
+        
+        // Use calculated balance for display
+        const syncedBalance = calculatedBalance;
+        
+        console.log(`📥 ${wallet.currency} wallet balance synced:`, {
           walletId: wallet.id,
-          balance: syncedBalance
+          storedBalance: wallet.balance,
+          calculatedBalance: syncedBalance
         });
         
         const standardizedWallet: StandardizedWallet = {
@@ -181,6 +193,24 @@ const lastSyncRef = useRef<number>(0);
         (payload) => {
           console.log('Transaction created');
           debouncedSync();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          // Refresh when transaction status changes to completed/approved
+          const newStatus = (payload as any)?.new?.status;
+          const newApprovalStatus = (payload as any)?.new?.approval_status;
+          if (newStatus === 'completed' || newApprovalStatus === 'approved' || newStatus === 'success') {
+            console.log('Transaction completed/approved - refreshing balance');
+            debouncedSync();
+          }
         }
       )
       .subscribe();

@@ -41,8 +41,44 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ profileData, onUpdate
 
   const handleSave = async () => {
     try {
+      // Validate email if it's being updated from temp email
+      const isTempEmail = profileData?.email?.includes('@yawatu.app');
+      if (isTempEmail && email && email !== profileData.email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          toast.error('Please enter a valid email address');
+          return;
+        }
+
+        // Check if email already exists
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email)
+          .neq('id', user?.id)
+          .single();
+
+        if (existingProfile) {
+          toast.error('This email is already in use');
+          return;
+        }
+
+        // Update auth email
+        const { error: authError } = await supabase.auth.updateUser({
+          email: email
+        });
+
+        if (authError) {
+          toast.error('Failed to update email');
+          console.error('Auth email update error:', authError);
+          return;
+        }
+      }
+
       const updatedData = {
         full_name: fullName,
+        email: isTempEmail ? email : profileData?.email,
         phone_number: phoneNumber,
         country: country,
         address: address,
@@ -159,15 +195,24 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ profileData, onUpdate
           />
         </div>
 
-        {/* Email - Display Only */}
+        {/* Email */}
         <div>
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">
+            Email {profileData?.email?.includes('@yawatu.app') && <span className="text-xs text-muted-foreground">(Temporary)</span>}
+          </Label>
           <Input
             type="email"
             id="email"
             value={email}
-            disabled
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={!isEditing || !profileData?.email?.includes('@yawatu.app')}
+            placeholder={profileData?.email?.includes('@yawatu.app') ? "Enter your real email" : ""}
           />
+          {profileData?.email?.includes('@yawatu.app') && isEditing && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Add your real email to receive important notifications
+            </p>
+          )}
         </div>
 
         {/* Action Buttons */}

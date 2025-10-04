@@ -6,14 +6,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Repeat, TrendingUp, AlertCircle } from 'lucide-react';
+import { Repeat, TrendingUp, AlertCircle, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTransactionFees } from '@/hooks/useTransactionFees';
 import WalletSecurityVerification from './WalletSecurityVerification';
 
-const WalletExchangeForm = () => {
+interface WalletExchangeFormProps {
+  onExchangeComplete?: () => void;
+}
+
+const WalletExchangeForm = ({ onExchangeComplete }: WalletExchangeFormProps) => {
   const [formData, setFormData] = useState({
     fromCurrency: '',
     toCurrency: '',
@@ -57,6 +61,7 @@ const WalletExchangeForm = () => {
         .eq('is_active', true);
 
       if (error) throw error;
+      console.log('Exchange rates loaded:', data);
       setExchangeRates(data || []);
     } catch (error) {
       console.error('Error loading exchange rates:', error);
@@ -84,12 +89,22 @@ const WalletExchangeForm = () => {
       return;
     }
 
+    if (!sourceWallet) {
+      toast.error(`You don't have a ${formData.fromCurrency} wallet. Please create one first.`);
+      return;
+    }
+
+    if (!destWallet) {
+      toast.error(`You don't have a ${formData.toCurrency} wallet. Please create one first.`);
+      return;
+    }
+
     if (!rate) {
       toast.error('Exchange rate not available for this currency pair');
       return;
     }
 
-    if (!sourceWallet || sourceWallet.balance < totalDeduction) {
+    if (sourceWallet.balance < totalDeduction) {
       toast.error('Insufficient balance including fees');
       return;
     }
@@ -127,6 +142,7 @@ const WalletExchangeForm = () => {
           amount: ''
         });
         loadWallets(); // Refresh wallet balances
+        onExchangeComplete?.(); // Call parent callback to refresh
       } else {
         throw new Error(data.error || 'Exchange failed');
       }
@@ -138,7 +154,27 @@ const WalletExchangeForm = () => {
     }
   };
 
-  const availableCurrencies = [...new Set(wallets.map(w => w.currency))];
+  const availableCurrencies = React.useMemo(() => {
+    // Get all unique currencies from exchange rates (both from and to)
+    const fromCurrencies = exchangeRates.map(r => r.from_currency);
+    const toCurrencies = exchangeRates.map(r => r.to_currency);
+    const allCurrencies = [...new Set([...fromCurrencies, ...toCurrencies])];
+    
+    console.log('Available currencies computed:', allCurrencies);
+    
+    // Prioritize currencies the user has wallets for
+    const userCurrencies = wallets.map(w => w.currency);
+    const sorted = allCurrencies.sort((a, b) => {
+      const aHasWallet = userCurrencies.includes(a);
+      const bHasWallet = userCurrencies.includes(b);
+      if (aHasWallet && !bHasWallet) return -1;
+      if (!aHasWallet && bHasWallet) return 1;
+      return a.localeCompare(b);
+    });
+    
+    console.log('Sorted currencies:', sorted);
+    return sorted;
+  }, [exchangeRates, wallets]);
 
   return (
     <>
@@ -150,6 +186,14 @@ const WalletExchangeForm = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Admin Reference Notice */}
+          <Alert className="mb-6 border-blue-200 bg-blue-50">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              Exchange rates are configured by administrators and updated regularly for fair market value.
+            </AlertDescription>
+          </Alert>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* From Currency */}
             <div className="space-y-2">
@@ -158,20 +202,33 @@ const WalletExchangeForm = () => {
                 <SelectTrigger>
                   <SelectValue placeholder="Select source currency" />
                 </SelectTrigger>
-                <SelectContent>
-                  {availableCurrencies.map((currency) => {
-                    const wallet = wallets.find(w => w.currency === currency);
-                    return (
-                      <SelectItem key={currency} value={currency}>
-                        <div className="flex items-center justify-between w-full">
-                          <span>{currency}</span>
-                          <Badge variant="outline">
-                            {currency} {wallet?.balance.toLocaleString()}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
+                <SelectContent className="bg-popover z-50">
+                  {availableCurrencies.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      No currencies available. Please contact support.
+                    </div>
+                  ) : (
+                    availableCurrencies.map((currency) => {
+                      const wallet = wallets.find(w => w.currency === currency);
+                      const hasWallet = !!wallet;
+                      return (
+                        <SelectItem key={currency} value={currency}>
+                          <div className="flex items-center justify-between w-full gap-2">
+                            <span className={!hasWallet ? 'text-muted-foreground' : ''}>{currency}</span>
+                            {hasWallet ? (
+                              <Badge variant="outline">
+                                {currency} {wallet.balance.toLocaleString()}
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">
+                                No wallet
+                              </Badge>
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -183,22 +240,37 @@ const WalletExchangeForm = () => {
                 <SelectTrigger>
                   <SelectValue placeholder="Select target currency" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-popover z-50">
                   {availableCurrencies
                     .filter(currency => currency !== formData.fromCurrency)
-                    .map((currency) => {
-                      const wallet = wallets.find(w => w.currency === currency);
-                      return (
-                        <SelectItem key={currency} value={currency}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{currency}</span>
-                            <Badge variant="outline">
-                              {currency} {wallet?.balance.toLocaleString()}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
+                    .length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      No currencies available. Please select a different source currency.
+                    </div>
+                  ) : (
+                    availableCurrencies
+                      .filter(currency => currency !== formData.fromCurrency)
+                      .map((currency) => {
+                        const wallet = wallets.find(w => w.currency === currency);
+                        const hasWallet = !!wallet;
+                        return (
+                          <SelectItem key={currency} value={currency}>
+                            <div className="flex items-center justify-between w-full gap-2">
+                              <span className={!hasWallet ? 'text-muted-foreground' : ''}>{currency}</span>
+                              {hasWallet ? (
+                                <Badge variant="outline">
+                                  {currency} {wallet.balance.toLocaleString()}
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs">
+                                  No wallet
+                                </Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -206,7 +278,7 @@ const WalletExchangeForm = () => {
             {/* Exchange Rate Display */}
             {rate && formData.fromCurrency && formData.toCurrency && (
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mb-1">
                   <TrendingUp className="h-4 w-4 text-blue-500" />
                   <span className="text-sm font-medium text-blue-800">
                     Exchange Rate: 1 {formData.fromCurrency} = {rate.rate} {formData.toCurrency}
@@ -217,6 +289,9 @@ const WalletExchangeForm = () => {
                     Spread: {rate.spread_percentage}%
                   </p>
                 )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Last updated: {new Date(rate.updated_at).toLocaleString()}
+                </p>
               </div>
             )}
 
@@ -224,7 +299,26 @@ const WalletExchangeForm = () => {
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Exchange rate not available for {formData.fromCurrency} to {formData.toCurrency}
+                  Exchange rate not available for {formData.fromCurrency} to {formData.toCurrency}. 
+                  Please contact support or try a different currency pair.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {!sourceWallet && formData.fromCurrency && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  You don't have a {formData.fromCurrency} wallet. Please create one first to exchange from this currency.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {!destWallet && formData.toCurrency && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  You don't have a {formData.toCurrency} wallet. Please create one first to receive this currency.
                 </AlertDescription>
               </Alert>
             )}
@@ -305,7 +399,16 @@ const WalletExchangeForm = () => {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={loading || !formData.fromCurrency || !formData.toCurrency || !formData.amount || !rate || totalDeduction > (sourceWallet?.balance || 0)}
+              disabled={
+                loading || 
+                !formData.fromCurrency || 
+                !formData.toCurrency || 
+                !formData.amount || 
+                !rate || 
+                !sourceWallet || 
+                !destWallet || 
+                (sourceWallet && totalDeduction > sourceWallet.balance)
+              }
             >
               {loading ? 'Processing...' : 'Exchange Currency'}
             </Button>

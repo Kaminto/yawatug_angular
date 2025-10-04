@@ -43,6 +43,8 @@ interface PendingTransaction {
   user_email?: string;
   user_phone?: string;
   risk_score?: number;
+  fee_amount?: number;
+  metadata?: any;
 }
 
 interface FilterOptions {
@@ -93,7 +95,7 @@ const EnhancedTransactionApprovalManager = () => {
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('transactions')
         .select('*')
-        .in('approval_status', ['pending', 'review'])
+        .in('approval_status', ['pending', 'review', 'auto_approved'])
         .order('created_at', { ascending: false });
 
       if (transactionsError) throw transactionsError;
@@ -368,7 +370,7 @@ const EnhancedTransactionApprovalManager = () => {
         </CardHeader>
         <CardContent>
           {/* Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-yellow-600" />
               <div>
@@ -389,6 +391,15 @@ const EnhancedTransactionApprovalManager = () => {
                 <p className="text-sm text-muted-foreground">Total Amount</p>
                 <p className="font-bold">
                   UGX {transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-orange-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Total Fees</p>
+                <p className="font-bold text-orange-600">
+                  UGX {transactions.reduce((sum, t) => sum + (t.fee_amount || 0), 0).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -508,11 +519,26 @@ const EnhancedTransactionApprovalManager = () => {
                       <div className="text-sm text-muted-foreground">{transaction.user_email}</div>
                     </div>
                   </TableCell>
-                  <TableCell>{getTransactionTypeBadge(transaction.transaction_type)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      {getTransactionTypeBadge(transaction.transaction_type)}
+                      {transaction.approval_status === 'auto_approved' && (
+                        <Badge variant="secondary" className="text-xs">
+                          Auto
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="font-mono">
                     <div className="font-bold">
                       {transaction.currency} {Math.abs(transaction.amount).toLocaleString()}
                     </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-orange-600">
+                    {transaction.currency} {(transaction.fee_amount || 0).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="font-mono text-green-600 font-medium">
+                    {transaction.currency} {(Math.abs(transaction.amount) - (transaction.fee_amount || 0)).toLocaleString()}
                   </TableCell>
                   <TableCell>{getRiskBadge(transaction.risk_score || 0)}</TableCell>
                   <TableCell>{getStatusBadge(transaction.approval_status)}</TableCell>
@@ -561,14 +587,34 @@ const EnhancedTransactionApprovalManager = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Type:</span>
-                  <span>{selectedTransaction.transaction_type}</span>
+                  <span className="capitalize">{selectedTransaction.transaction_type}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Amount:</span>
-                  <span className="font-mono">
-                    {selectedTransaction.currency} {Math.abs(selectedTransaction.amount).toLocaleString()}
-                  </span>
+                
+                {/* Fee Breakdown */}
+                <div className="border-t pt-2 mt-2">
+                  <p className="text-sm font-medium mb-2">Transaction Breakdown:</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Gross Amount:</span>
+                      <span className="font-mono font-medium">
+                        {selectedTransaction.currency} {Math.abs(selectedTransaction.amount).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Transaction Fee:</span>
+                      <span className="font-mono font-medium text-orange-600">
+                        {selectedTransaction.currency} {(selectedTransaction.fee_amount || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm font-medium border-t pt-1">
+                      <span>Net Amount:</span>
+                      <span className="font-mono text-green-600">
+                        {selectedTransaction.currency} {(Math.abs(selectedTransaction.amount) - (selectedTransaction.fee_amount || 0)).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
                 </div>
+                
                 <div className="flex justify-between">
                   <span className="font-medium">Risk Score:</span>
                   {getRiskBadge(selectedTransaction.risk_score || 0)}

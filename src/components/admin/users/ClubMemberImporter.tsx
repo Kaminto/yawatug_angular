@@ -9,6 +9,7 @@ import { Download, Upload } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
+import { normalizePhoneNumber } from '@/lib/utils';
 
 interface ClubMemberData {
   name: string;
@@ -68,18 +69,18 @@ const ClubMemberImporter = () => {
     return emailRegex.test(email);
   };
 
-  const normalizePhone = (phone: string): string => {
-    // Remove spaces, dashes, parentheses
-    let cleaned = phone.replace(/[\s\-\(\)]/g, '');
-    
-    // Convert +256 or 256 prefix to 0
-    if (cleaned.startsWith('+256')) {
-      cleaned = '0' + cleaned.substring(4);
-    } else if (cleaned.startsWith('256')) {
-      cleaned = '0' + cleaned.substring(3);
+  const normalizePhone = (phoneRaw: any): string => {
+    if (!phoneRaw) return '';
+    const raw = String(phoneRaw).trim();
+
+    // Do NOT attempt to reconstruct scientific notation – it loses digits from Excel.
+    // If we detect it, treat as invalid so the user can correct the CSV (format column as Text).
+    if (/[eE]\+?\d+/.test(raw)) {
+      return '';
     }
-    
-    return cleaned;
+
+    // Use shared normalizer from utils to handle +256/256/0 formats and stripping spaces/dashes
+    return normalizePhoneNumber(raw);
   };
 
   const validateRow = (row: any, index: number): ImportError[] => {
@@ -95,6 +96,25 @@ const ClubMemberImporter = () => {
     
     if (!row.phone || row.phone.trim() === '') {
       errors.push({ row: index + 1, field: 'phone', message: 'Phone is required' });
+    } else {
+      // Check for scientific notation (Excel conversion issue)
+      const phoneStr = String(row.phone).trim();
+      if (/[eE]\+?\d+/.test(phoneStr)) {
+        errors.push({ 
+          row: index + 1, 
+          field: 'phone', 
+          message: `Phone in scientific notation (Excel error). Format phone column as Text before export: ${phoneStr}` 
+        });
+      } else {
+        const normalized = normalizePhone(row.phone);
+        if (!normalized || normalized.length !== 10 || !normalized.startsWith('0')) {
+          errors.push({ 
+            row: index + 1, 
+            field: 'phone', 
+            message: `Invalid phone format. Expected: +256XXXXXXXXX or 0XXXXXXXXX. Got: ${row.phone}` 
+          });
+        }
+      }
     }
     
     const receipts = parseFloat(row.receipts || '0');
@@ -356,10 +376,34 @@ const ClubMemberImporter = () => {
           const member = duplicates[i];
           
           try {
+            // First, check if phone number differs and update profile if needed
+            const { data: existingProfile } = await supabase
+              .from('profiles')
+              .select('id, phone')
+              .eq('email', member.email)
+              .single();
+
+            if (existingProfile && existingProfile.phone !== member.phone) {
+              console.log(`Updating phone for ${member.email}: ${existingProfile.phone} -> ${member.phone}`);
+              
+              const { error: phoneUpdateError } = await supabase
+                .from('profiles')
+                .update({ 
+                  phone: member.phone,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('email', member.email);
+
+              if (phoneUpdateError) {
+                console.error('Phone update error for:', member.email, phoneUpdateError);
+              }
+            }
+
             // Update the financial data in investment_club_members
             const { error: updateError } = await supabase
               .from('investment_club_members')
               .update({
+                phone: member.phone, // Also update phone here
                 total_deposits: member.receipts,
                 total_withdrawals: member.payments,
                 net_balance: member.net_balance,

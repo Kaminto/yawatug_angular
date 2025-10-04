@@ -1,12 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, ArrowUpRight, ArrowRightLeft, Repeat, History, Settings, Shield, Play, Trash2 } from 'lucide-react';
+import { Download, ArrowUpRight, ArrowRightLeft, Repeat, History, Settings, Play, Plus, Minus } from 'lucide-react';
 import { useEnhancedWalletContext } from '@/hooks/useEnhancedWalletContext';
 import { useDemoData } from '@/hooks/useDemoData';
 import { WalletSkeleton, TransactionSkeleton } from '@/components/ui/enhanced-skeleton';
@@ -17,6 +15,12 @@ import WalletTransferForm from '@/components/wallet/WalletTransferForm';
 import WalletExchangeForm from '@/components/wallet/WalletExchangeForm';
 import EnhancedTransactionHistory from '@/components/wallet/EnhancedTransactionHistory';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface Wallet {
   id: string;
@@ -37,6 +41,7 @@ const EnhancedUserWalletDashboard = () => {
     smsNotifications: false,
     pushNotifications: true
   });
+  const [activeDialog, setActiveDialog] = useState<'deposit' | 'withdraw' | 'transfer' | 'exchange' | null>(null);
 
   useEffect(() => {
     if (!contextLoading && currentUserId) {
@@ -82,6 +87,7 @@ const EnhancedUserWalletDashboard = () => {
 
   const handleTransactionComplete = async () => {
     await loadWalletData();
+    setActiveDialog(null);
   };
 
   const handleGenerateDemo = async () => {
@@ -106,7 +112,6 @@ const EnhancedUserWalletDashboard = () => {
 
   return (
     <div className="space-y-6">
-
       {/* Demo Data Controls */}
       {!hasData && (
         <Card className="border-dashed">
@@ -134,170 +139,131 @@ const EnhancedUserWalletDashboard = () => {
         </Card>
       )}
 
-
       {/* Real-time Wallet Balances */}
       <RealTimeWalletBalance />
 
-      {/* Enhanced Transaction Interface */}
-      <Tabs defaultValue="deposit" className="space-y-4">
-        <TabsList className="w-full overflow-x-auto">
-          <TabsTrigger value="deposit" className="flex items-center gap-1 sm:gap-2">
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Deposit</span>
-            <span className="sm:hidden">Dep</span>
-          </TabsTrigger>
-          <TabsTrigger value="withdraw" className="flex items-center gap-1 sm:gap-2">
-            <ArrowUpRight className="h-4 w-4" />
-            <span className="hidden sm:inline">Withdraw</span>
-            <span className="sm:hidden">With</span>
-          </TabsTrigger>
-          <TabsTrigger value="transfer" className="flex items-center gap-1 sm:gap-2">
-            <ArrowRightLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Transfer</span>
-            <span className="sm:hidden">Trans</span>
-          </TabsTrigger>
-          <TabsTrigger value="exchange" className="flex items-center gap-1 sm:gap-2">
-            <Repeat className="h-4 w-4" />
-            <span className="hidden sm:inline">Exchange</span>
-            <span className="sm:hidden">Exch</span>
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-1 sm:gap-2">
+      {/* Quick Actions Header */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold">Quick Actions</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-primary/10 hover:border-primary"
+              onClick={() => setActiveDialog('deposit')}
+            >
+              <Plus className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">Deposit</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-secondary/10 hover:border-secondary"
+              onClick={() => setActiveDialog('withdraw')}
+            >
+              <Minus className="h-5 w-5 text-secondary" />
+              <span className="text-sm font-medium">Withdraw</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-primary/10 hover:border-primary"
+              onClick={() => setActiveDialog('transfer')}
+            >
+              <ArrowRightLeft className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">Transfer</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-accent/10 hover:border-accent"
+              onClick={() => setActiveDialog('exchange')}
+            >
+              <Repeat className="h-5 w-5 text-accent" />
+              <span className="text-sm font-medium">Exchange</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tabs - Only History and Settings */}
+      <Tabs defaultValue="history" className="space-y-4">
+        <TabsList className="w-full">
+          <TabsTrigger value="history" className="flex items-center gap-2 flex-1">
             <History className="h-4 w-4" />
-            <span className="hidden sm:inline">History</span>
-            <span className="sm:hidden">Hist</span>
+            <span>History</span>
           </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-1 sm:gap-2">
+          <TabsTrigger value="settings" className="flex items-center gap-2 flex-1">
             <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Settings</span>
-            <span className="sm:hidden">Set</span>
+            <span>Settings</span>
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="deposit">
-          <EnhancedWalletDepositForm 
-            wallets={wallets}
-            onDepositComplete={handleTransactionComplete}
-          />
-        </TabsContent>
-
-        <TabsContent value="withdraw">
-          <EnhancedWalletWithdrawForm 
-            wallets={wallets}
-            onWithdrawComplete={handleTransactionComplete}
-          />
-        </TabsContent>
-
-        <TabsContent value="transfer">
-          <WalletTransferForm 
-            wallets={wallets}
-            onTransferComplete={() => transactionHistoryRef.current?.refresh()} 
-          />
-        </TabsContent>
-
-        <TabsContent value="exchange">
-          <WalletExchangeForm />
-        </TabsContent>
 
         <TabsContent value="history">
           {loading ? <TransactionSkeleton /> : <EnhancedTransactionHistory ref={transactionHistoryRef} />}
         </TabsContent>
 
         <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Wallet Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Notification Preferences */}
-              <div>
-                <h3 className="font-medium mb-4">Notification Preferences</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Email Notifications</h4>
-                      <p className="text-sm text-muted-foreground">Receive transaction alerts via email</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notificationSettings.emailNotifications}
-                      onChange={(e) => setNotificationSettings(prev => ({
-                        ...prev,
-                        emailNotifications: e.target.checked
-                      }))}
-                      className="rounded"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">SMS Notifications</h4>
-                      <p className="text-sm text-muted-foreground">Receive transaction alerts via SMS</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notificationSettings.smsNotifications}
-                      onChange={(e) => setNotificationSettings(prev => ({
-                        ...prev,
-                        smsNotifications: e.target.checked
-                      }))}
-                      className="rounded"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Push Notifications</h4>
-                      <p className="text-sm text-muted-foreground">Receive real-time push notifications</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notificationSettings.pushNotifications}
-                      onChange={(e) => setNotificationSettings(prev => ({
-                        ...prev,
-                        pushNotifications: e.target.checked
-                      }))}
-                      className="rounded"
-                    />
-                  </div>
-                </div>
-                
-                <Button className="w-full mt-4">
-                  Save Notification Settings
-                </Button>
-              </div>
-
-              {/* Security Settings */}
-              <div className="border-t pt-6">
-                <h3 className="font-medium mb-4">Security Settings</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Two-Factor Authentication</h4>
-                      <p className="text-sm text-muted-foreground">Enhance security with 2FA</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Configure
-                    </Button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Transaction PIN</h4>
-                      <p className="text-sm text-muted-foreground">Set a PIN for transactions</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Set PIN
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+...
         </TabsContent>
       </Tabs>
+
+      {/* Dialogs for Quick Actions */}
+      <Dialog open={activeDialog === 'deposit'} onOpenChange={(open) => !open && setActiveDialog(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              Deposit Funds
+            </DialogTitle>
+          </DialogHeader>
+          <EnhancedWalletDepositForm 
+            wallets={wallets}
+            onDepositComplete={handleTransactionComplete}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={activeDialog === 'withdraw'} onOpenChange={(open) => !open && setActiveDialog(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Minus className="h-5 w-5 text-secondary" />
+              Withdraw Funds
+            </DialogTitle>
+          </DialogHeader>
+          <EnhancedWalletWithdrawForm 
+            wallets={wallets}
+            onWithdrawComplete={handleTransactionComplete}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={activeDialog === 'transfer'} onOpenChange={(open) => !open && setActiveDialog(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5 text-primary" />
+              Transfer Funds
+            </DialogTitle>
+          </DialogHeader>
+          <WalletTransferForm 
+            wallets={wallets}
+            onTransferComplete={handleTransactionComplete}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={activeDialog === 'exchange'} onOpenChange={(open) => !open && setActiveDialog(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Repeat className="h-5 w-5 text-accent" />
+              Exchange Currency
+            </DialogTitle>
+          </DialogHeader>
+          <WalletExchangeForm />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

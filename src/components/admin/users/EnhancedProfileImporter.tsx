@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, Upload, AlertCircle, CheckCircle, Eye, FileText, Users } from 'lucide-react';
+import { Download, Upload, AlertCircle, CheckCircle, Eye, FileText, Users, RefreshCw } from 'lucide-react';
+import { formatPhoneNumber, normalizePhoneNumber } from '@/lib/utils';
 
 interface ImportError {
   row: number;
@@ -31,6 +32,10 @@ interface PreviewData {
   gender: string;
   tin: string;
   account_type: string;
+  rowNumber?: number;
+  category?: 'new' | 'phone_update' | 'rejected';
+  existingPhone?: string;
+  existingProfileId?: string;
 }
 
 interface ImportStats {
@@ -69,40 +74,57 @@ const EnhancedProfileImporter = () => {
     return isValid;
   };
 
-  const normalizePhone = (phone: string): string => {
-    console.log('Normalizing phone:', phone);
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
     
-    // Handle scientific notation (e.g., 2.567E+11 from Excel)
-    let cleaned = phone.trim();
-    if (cleaned.includes('E') || cleaned.includes('e')) {
-      const number = parseFloat(cleaned);
-      if (!isNaN(number)) {
-        cleaned = number.toString();
-        console.log('Converted from scientific notation:', phone, '→', cleaned);
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+      
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          // Escaped quote
+          current += '"';
+          i++; // Skip next quote
+        } else {
+          // Toggle quote state
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        // End of field
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
       }
     }
     
-    // Remove all spaces, dashes, and parentheses
-    cleaned = cleaned.replace(/[\s\-\(\)]/g, '');
-    console.log('After cleaning:', cleaned);
-    
-    // Convert +256 to 0 (Uganda country code)
-    if (cleaned.startsWith('+256')) {
-      cleaned = '0' + cleaned.substring(4);
-    } else if (cleaned.startsWith('256')) {
-      cleaned = '0' + cleaned.substring(3);
+    // Add last field
+    result.push(current.trim());
+    return result;
+  };
+
+  const normalizePhone = (phone: string): string => {
+    if (!phone) return '';
+    const raw = String(phone).trim();
+
+    // Do NOT attempt to reconstruct scientific notation – it loses digits from Excel.
+    // If we detect it, treat as invalid so the user can correct the CSV (format column as Text).
+    if (/[eE]\+?\d+/.test(raw)) {
+      return '';
     }
-    
-    console.log('Final normalized phone:', cleaned);
-    return cleaned;
+
+    // Use shared normalizer to handle +256/256/0 formats and stripping spaces/dashes
+    return normalizePhoneNumber(raw);
   };
 
   const validatePhone = (phone: string): boolean => {
     const normalized = normalizePhone(phone);
+    if (!normalized) return false; // Reject empty or scientific notation
     const phoneRegex = /^0\d{9}$/; // Uganda phone format: 0 followed by 9 digits
-    const isValid = phoneRegex.test(normalized);
-    console.log('Validating phone:', phone, '-> normalized:', normalized, '-> valid:', isValid);
-    return isValid;
+    return phoneRegex.test(normalized);
   };
 
   const validateDate = (date: string): boolean => {
@@ -146,26 +168,38 @@ const EnhancedProfileImporter = () => {
     // Check phone format if provided
     if (hasPhone) {
       const originalPhone = row.phone;
-      const normalizedPhone = normalizePhone(originalPhone);
-      const phoneRegex = /^0\d{9}$/;
-      const isValid = phoneRegex.test(normalizedPhone);
       
-      console.log('📞 Phone validation details:');
-      console.log('  Original:', originalPhone);
-      console.log('  Normalized:', normalizedPhone);
-      console.log('  Regex test:', isValid);
-      console.log('  Length:', normalizedPhone.length);
-      
-      if (!isValid) {
-        console.log('❌ Phone validation failed');
+      // Check for scientific notation first (Excel conversion issue)
+      if (/[eE]\+?\d+/.test(String(originalPhone))) {
+        console.log('❌ Phone in scientific notation:', originalPhone);
         rowErrors.push({ 
           row: index + 2, 
           field: 'phone', 
-          message: `Invalid phone format. Original: ${originalPhone}, Normalized: ${normalizedPhone}`, 
+          message: `Phone in scientific notation (Excel error). Format phone column as Text before export: ${originalPhone}`, 
           value: originalPhone 
         });
       } else {
-        console.log('✅ Phone valid');
+        const normalizedPhone = normalizePhone(originalPhone);
+        const phoneRegex = /^0\d{9}$/;
+        const isValid = phoneRegex.test(normalizedPhone);
+        
+        console.log('📞 Phone validation details:');
+        console.log('  Original:', originalPhone);
+        console.log('  Normalized:', normalizedPhone);
+        console.log('  Regex test:', isValid);
+        console.log('  Length:', normalizedPhone.length);
+        
+        if (!isValid) {
+          console.log('❌ Phone validation failed');
+          rowErrors.push({ 
+            row: index + 2, 
+            field: 'phone', 
+            message: `Invalid phone format. Expected: +256XXXXXXXXX or 0XXXXXXXXX. Got: ${originalPhone}`, 
+            value: originalPhone 
+          });
+        } else {
+          console.log('✅ Phone valid');
+        }
       }
     } else {
       console.log('ℹ️ No phone provided (optional)');
@@ -263,7 +297,7 @@ const EnhancedProfileImporter = () => {
         return;
       }
 
-      const headers = lines[0].split(',').map(h => h.trim());
+      const headers = parseCSVLine(lines[0]);
       const requiredHeaders = ['full_name'];
       const contactHeaders = ['email', 'phone'];
       
@@ -283,24 +317,33 @@ const EnhancedProfileImporter = () => {
       const parsedData: PreviewData[] = [];
       const allErrors: ImportError[] = [];
 
-      // Check for existing emails to detect duplicates
+      // Check for existing profiles by email and phone
       const emails = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim());
+        const values = parseCSVLine(line);
         const emailIndex = headers.indexOf('email');
-        return values[emailIndex];
+        return emailIndex >= 0 ? values[emailIndex] : '';
+      }).filter(Boolean);
+
+      const phones = lines.slice(1).map(line => {
+        const values = parseCSVLine(line);
+        const phoneIndex = headers.indexOf('phone');
+        return phoneIndex >= 0 ? normalizePhone(values[phoneIndex]) : '';
       }).filter(Boolean);
 
       const { data: existingProfiles } = await supabase
         .from('profiles')
-        .select('email')
-        .in('email', emails);
+        .select('id, email, phone')
+        .or(`email.in.(${emails.join(',')}),phone.in.(${phones.join(',')})`);
 
-      const existingEmails = new Set(existingProfiles?.map(p => p.email) || []);
+      const existingByEmail = new Map(existingProfiles?.map(p => [p.email, p]) || []);
+      const existingByPhone = new Map(existingProfiles?.map(p => [p.phone, p]) || []);
       const duplicateEmails = new Set<string>();
       const seenEmails = new Set<string>();
+      const seenPhones = new Set<string>();
+      const duplicatePhones = new Set<string>();
 
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
+        const values = parseCSVLine(lines[i]);
         if (values.length < headers.length) {
           console.log(`⚠️ Row ${i + 1} has insufficient columns:`, values.length, 'vs', headers.length);
           continue;
@@ -313,7 +356,12 @@ const EnhancedProfileImporter = () => {
 
         console.log(`Processing row ${i + 1}:`, rowData);
 
-        // Check for duplicates within the file
+        const normalizedPhone = rowData.phone ? normalizePhone(rowData.phone) : '';
+        let category: 'new' | 'phone_update' | 'rejected' = 'new';
+        let existingProfile = null;
+        let existingPhone = '';
+
+        // Check for duplicate emails within the file
         if (seenEmails.has(rowData.email)) {
           duplicateEmails.add(rowData.email);
           allErrors.push({ 
@@ -322,27 +370,65 @@ const EnhancedProfileImporter = () => {
             message: 'Duplicate email in file', 
             value: rowData.email 
           });
+          category = 'rejected';
         } else {
           seenEmails.add(rowData.email);
         }
 
-        // Check for existing emails in database
-        if (existingEmails.has(rowData.email)) {
+        // Check for duplicate phones within the file
+        if (normalizedPhone && seenPhones.has(normalizedPhone)) {
+          duplicatePhones.add(normalizedPhone);
           allErrors.push({ 
             row: i + 1, 
-            field: 'email', 
-            message: 'Email already exists in database', 
-            value: rowData.email 
+            field: 'phone', 
+            message: 'Duplicate phone number in file', 
+            value: normalizedPhone 
+          });
+          category = 'rejected';
+        } else if (normalizedPhone) {
+          seenPhones.add(normalizedPhone);
+        }
+
+        // Check for existing profile by email or phone
+        if (rowData.email && existingByEmail.has(rowData.email)) {
+          existingProfile = existingByEmail.get(rowData.email)!;
+          existingPhone = existingProfile.phone || '';
+          
+          // Check if phone will be updated
+          if (normalizedPhone && normalizedPhone !== existingPhone) {
+            category = 'phone_update';
+          } else {
+            category = 'rejected';
+            allErrors.push({ 
+              row: i + 1, 
+              field: 'email', 
+              message: 'Profile exists with same data', 
+              value: rowData.email 
+            });
+          }
+        } else if (normalizedPhone && existingByPhone.has(normalizedPhone)) {
+          existingProfile = existingByPhone.get(normalizedPhone)!;
+          existingPhone = existingProfile.phone || '';
+          category = 'rejected';
+          allErrors.push({ 
+            row: i + 1, 
+            field: 'phone', 
+            message: 'Phone already exists in database', 
+            value: normalizedPhone 
           });
         }
 
         const rowErrors = validateRow(rowData, i - 1);
         allErrors.push(...rowErrors);
 
+        if (rowErrors.length > 0 && category !== 'rejected') {
+          category = 'rejected';
+        }
+
         parsedData.push({
           full_name: rowData.full_name || '',
           email: rowData.email || '',
-          phone: rowData.phone || '',
+          phone: normalizedPhone || '',
           user_type: rowData.user_type || 'individual',
           nationality: rowData.nationality || '',
           country_of_residence: rowData.country_of_residence || '',
@@ -350,7 +436,11 @@ const EnhancedProfileImporter = () => {
           date_of_birth: rowData.date_of_birth || '',
           gender: rowData.gender || '',
           tin: rowData.tin || '',
-          account_type: rowData.account_type || rowData.user_type || 'individual'
+          account_type: rowData.account_type || rowData.user_type || 'individual',
+          rowNumber: i + 1,
+          category,
+          existingPhone,
+          existingProfileId: existingProfile?.id
         });
       }
 
@@ -417,14 +507,63 @@ const EnhancedProfileImporter = () => {
       for (let i = 0; i < previewData.length; i++) {
         const profile = previewData[i];
         
-        // Skip records with missing critical fields only
+        // Skip rejected profiles
+        if (profile.category === 'rejected') {
+          rejectedRecords.push({ 
+            data: profile, 
+            errors: [{ row: profile.rowNumber || i + 2, field: 'validation', message: 'Failed validation' }] 
+          });
+          importStats.failed++;
+          importStats.processed++;
+          continue;
+        }
+
+        // Handle phone updates
+        if (profile.category === 'phone_update' && profile.existingProfileId) {
+          try {
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ 
+                phone: profile.phone,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', profile.existingProfileId);
+
+            if (updateError) {
+              console.error('Phone update error:', updateError);
+              rejectedRecords.push({ 
+                data: profile, 
+                errors: [{ row: profile.rowNumber || i + 2, field: 'update', message: `Update failed: ${updateError.message}` }] 
+              });
+              importStats.failed++;
+            } else {
+              console.log('Phone updated successfully for:', profile.email);
+              importStats.successful++;
+              importedRecords.push(profile);
+            }
+          } catch (error) {
+            console.error('Phone update error:', error);
+            rejectedRecords.push({ 
+              data: profile, 
+              errors: [{ row: profile.rowNumber || i + 2, field: 'update', message: 'Failed to update phone' }] 
+            });
+            importStats.failed++;
+          }
+          
+          importStats.processed++;
+          setImportProgress((importStats.processed / previewData.length) * 100);
+          setStats({ ...importStats });
+          continue;
+        }
+        
+        // Create new profiles (category === 'new')
         const hasEmail = profile.email?.trim();
         const hasPhone = profile.phone?.trim();
         
         if (!profile.full_name?.trim() || (!hasEmail && !hasPhone)) {
           rejectedRecords.push({ 
             data: profile, 
-            errors: [{ row: i + 2, field: 'required', message: 'Missing name or contact method (email/phone)' }] 
+            errors: [{ row: profile.rowNumber || i + 2, field: 'required', message: 'Missing name or contact method (email/phone)' }] 
           });
           importStats.failed++;
           importStats.processed++;
@@ -657,6 +796,15 @@ const EnhancedProfileImporter = () => {
               </p>
             </div>
 
+            <Alert className="bg-amber-50 border-amber-200">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800">
+                <strong>Excel Users:</strong> Format the phone column as TEXT before entering numbers. 
+                Otherwise Excel converts large numbers to scientific notation (e.g., 2.56E+11) which corrupts the data.
+                Right-click column → Format Cells → Text, then enter phone numbers with leading zeros (e.g., 0785123456).
+              </AlertDescription>
+            </Alert>
+
             {parsing && (
               <Alert>
                 <FileText className="h-4 w-4" />
@@ -667,7 +815,7 @@ const EnhancedProfileImporter = () => {
             )}
 
             {showPreview && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <Card>
                   <CardContent className="p-4">
                     <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
@@ -676,14 +824,27 @@ const EnhancedProfileImporter = () => {
                 </Card>
                 <Card>
                   <CardContent className="p-4">
-                    <div className="text-2xl font-bold text-green-600">{stats.total - errors.length}</div>
-                    <div className="text-sm text-muted-foreground">Valid Records</div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {previewData.filter(p => p.category === 'new').length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">New Imports</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {previewData.filter(p => p.category === 'phone_update').length}
+                    </div>
+                    <div className="text-sm text-muted-foreground flex items-center gap-1">
+                      <RefreshCw className="h-3 w-3" />
+                      Phone Updates
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="p-4">
                     <div className="text-2xl font-bold text-red-600">{errors.length}</div>
-                    <div className="text-sm text-muted-foreground">Errors</div>
+                    <div className="text-sm text-muted-foreground">Rejected</div>
                   </CardContent>
                 </Card>
                 <Card>
@@ -711,11 +872,11 @@ const EnhancedProfileImporter = () => {
             
             <Button 
               onClick={handleImport} 
-              disabled={!showPreview || importing}
+              disabled={!showPreview || importing || previewData.filter(p => p.category !== 'rejected').length === 0}
               className="w-full flex items-center gap-2"
             >
               <Upload className="h-4 w-4" />
-              {importing ? 'Importing...' : `Import Valid Records (${previewData.length - errors.length}/${previewData.length})`}
+              {importing ? 'Importing...' : `Import Profiles (${previewData.filter(p => p.category !== 'rejected').length} valid)`}
             </Button>
 
             {importResult && (
@@ -757,50 +918,143 @@ const EnhancedProfileImporter = () => {
           </TabsContent>
 
           <TabsContent value="preview" className="space-y-4">
-            {previewData.length > 0 && (
+            {/* New Imports */}
+            {previewData.filter(p => p.category === 'new').length > 0 && (
               <div className="border rounded-lg overflow-hidden">
-                <div className="bg-muted p-4 border-b">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Eye className="h-4 w-4" />
-                    Data Preview ({previewData.length} records)
+                <div className="bg-green-50 p-4 border-b border-green-200">
+                  <h3 className="font-semibold flex items-center gap-2 text-green-800">
+                    <CheckCircle className="h-4 w-4" />
+                    New Imports ({previewData.filter(p => p.category === 'new').length})
                   </h3>
                 </div>
-                <div className="max-h-96 overflow-auto">
+                <div className="max-h-64 overflow-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead className="bg-muted/50 sticky top-0">
                       <tr>
+                        <th className="p-2 text-left">Row</th>
                         <th className="p-2 text-left">Name</th>
                         <th className="p-2 text-left">Email</th>
                         <th className="p-2 text-left">Phone</th>
                         <th className="p-2 text-left">Type</th>
-                        <th className="p-2 text-left">Country</th>
-                        <th className="p-2 text-left">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {previewData.slice(0, 50).map((row, index) => (
-                        <tr key={index} className="border-b">
-                          <td className="p-2">{row.full_name}</td>
+                      {previewData.filter(p => p.category === 'new').map((row, index) => (
+                        <tr key={index} className="border-b bg-green-50/30">
+                          <td className="p-2 text-muted-foreground">{row.rowNumber}</td>
+                          <td className="p-2 font-medium">{row.full_name}</td>
+                          <td className="p-2">{row.email || '-'}</td>
+                          <td className="p-2">{formatPhoneNumber(row.phone) || '-'}</td>
+                          <td className="p-2">{row.account_type}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Phone Updates */}
+            {previewData.filter(p => p.category === 'phone_update').length > 0 && (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-blue-50 p-4 border-b border-blue-200">
+                  <h3 className="font-semibold flex items-center gap-2 text-blue-800">
+                    <RefreshCw className="h-4 w-4" />
+                    Phone Number Updates ({previewData.filter(p => p.category === 'phone_update').length})
+                  </h3>
+                </div>
+                <div className="max-h-64 overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 sticky top-0">
+                      <tr>
+                        <th className="p-2 text-left">Row</th>
+                        <th className="p-2 text-left">Name</th>
+                        <th className="p-2 text-left">Email</th>
+                        <th className="p-2 text-left">Old Phone</th>
+                        <th className="p-2 text-left">New Phone</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewData.filter(p => p.category === 'phone_update').map((row, index) => (
+                        <tr key={index} className="border-b bg-blue-50/30">
+                          <td className="p-2 text-muted-foreground">{row.rowNumber}</td>
+                          <td className="p-2 font-medium">{row.full_name}</td>
                           <td className="p-2">{row.email}</td>
-                          <td className="p-2">{row.phone}</td>
-                          <td className="p-2">{row.user_type}</td>
-                          <td className="p-2">{row.country_of_residence}</td>
-                          <td className="p-2">
-                            {errors.some(e => e.row === index + 2) ? (
-                              <Badge variant="destructive">Has Errors</Badge>
-                            ) : (
-                              <Badge variant="secondary">Valid</Badge>
-                            )}
+                          <td className="p-2 text-muted-foreground line-through">
+                            {formatPhoneNumber(row.existingPhone) || '-'}
+                          </td>
+                          <td className="p-2 font-semibold text-blue-600">
+                            {formatPhoneNumber(row.phone)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  {previewData.length > 50 && (
-                    <div className="p-4 text-center text-muted-foreground">
-                      ... and {previewData.length - 50} more records
-                    </div>
-                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Rejected */}
+            {previewData.filter(p => p.category === 'rejected').length > 0 && (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-red-50 p-4 border-b border-red-200 flex items-center justify-between">
+                  <h3 className="font-semibold flex items-center gap-2 text-red-800">
+                    <AlertCircle className="h-4 w-4" />
+                    Rejected ({previewData.filter(p => p.category === 'rejected').length})
+                  </h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const rejected = previewData.filter(p => p.category === 'rejected');
+                      const headers = ['row', 'full_name', 'email', 'phone', 'reason'];
+                      const rows = rejected.map(r => {
+                        const rowErrors = errors.filter(e => e.row === r.rowNumber);
+                        const reason = rowErrors.map(e => `${e.field}: ${e.message}`).join('; ');
+                        return [r.rowNumber, r.full_name, r.email, r.phone, reason];
+                      });
+                      const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `rejected_profiles_${new Date().toISOString().split('T')[0]}.csv`;
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Download Rejected
+                  </Button>
+                </div>
+                <div className="max-h-64 overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 sticky top-0">
+                      <tr>
+                        <th className="p-2 text-left">Row</th>
+                        <th className="p-2 text-left">Name</th>
+                        <th className="p-2 text-left">Email</th>
+                        <th className="p-2 text-left">Phone</th>
+                        <th className="p-2 text-left">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewData.filter(p => p.category === 'rejected').map((row, index) => {
+                        const rowErrors = errors.filter(e => e.row === row.rowNumber);
+                        return (
+                          <tr key={index} className="border-b bg-red-50/30">
+                            <td className="p-2 text-muted-foreground">{row.rowNumber}</td>
+                            <td className="p-2 font-medium">{row.full_name}</td>
+                            <td className="p-2">{row.email || '-'}</td>
+                            <td className="p-2">{formatPhoneNumber(row.phone) || '-'}</td>
+                            <td className="p-2 text-red-600 text-xs">
+                              {rowErrors.map(e => e.message).join('; ')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}

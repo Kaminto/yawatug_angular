@@ -153,8 +153,21 @@ const TransactionStatusTracker: React.FC<TransactionStatusTrackerProps> = ({
         </div>
 
         {/* Status Message */}
-        <div className="p-4 bg-gray-50 rounded-lg">
+        <div className={`p-4 rounded-lg ${
+          transaction.status === 'pending' || transaction.status === 'processing' 
+            ? 'bg-blue-50 dark:bg-blue-950' 
+            : transaction.status === 'completed' 
+            ? 'bg-green-50 dark:bg-green-950'
+            : 'bg-red-50 dark:bg-red-950'
+        }`}>
           <p className="text-sm">{getStatusMessage()}</p>
+          
+          {(transaction.status === 'pending' || transaction.status === 'processing') && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3 animate-pulse" />
+              <span>Waiting for confirmation... This typically takes 1-5 minutes.</span>
+            </div>
+          )}
         </div>
 
         {/* Progress Steps */}

@@ -34,7 +34,7 @@ interface ChatMessage {
 }
 
 interface EnhancedChatBotProps {
-  userRole?: 'user' | 'admin';
+  userRole?: 'user' | 'admin' | 'visitor';
   visitorContext?: any;
 }
 
@@ -80,11 +80,11 @@ export const EnhancedChatBot: React.FC<EnhancedChatBotProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, voiceMessages]);
 
-  // Welcome message with auto-play voice
+  // Welcome message with auto-play voice - EMPHASIZING LIFETIME OWNERSHIP
   useEffect(() => {
     const welcomeMessage = userRole === 'admin' 
-      ? "Hello! I'm your Yawatu Admin Assistant with enhanced voice capabilities. I can help you manage the platform, analyze data, and provide administrative insights. Try the voice chat feature for real-time conversations! What would you like to know?"
-      : "Welcome to Yawatu Minerals & Mining! I'm your AI investment assistant with professional voice support powered by ElevenLabs. I can help you with share investments, bookings, referral earnings, wallet management, and answer any questions about our mining operations. You can type or use the Voice Chat feature for natural conversations. How may I assist you today?";
+      ? "Hello! I'm your Yawatu Admin Assistant with enhanced voice capabilities. I can help you manage the platform, analyze data, process verifications, monitor transactions, and provide administrative insights. Use voice chat for hands-free support or type your questions. What would you like to know?"
+      : "Welcome back to Yawatu Minerals & Mining! 🌟 As a shareholder, you're a LIFETIME OWNER of Uganda's mineral wealth, earning dividends as long as the company operates. I'm here to help you manage your investments, track your earnings, explore the referral program (5% commission forever!), handle wallet transactions, and answer any questions. How can I help you grow your wealth today? 💎";
 
     setMessages([{
       id: '1',
@@ -157,12 +157,29 @@ export const EnhancedChatBot: React.FC<EnhancedChatBotProps> = ({
             knowledgeBase: yawutuKnowledgeBase,
             userRole,
             visitorContext,
-            systemContext: `You are Yawatu's AI assistant. Help users with:
-            - Share investments and bookings (down payments, installments)
-            - Referral program (5% commission on all purchases and bookings)
-            - Wallet management (deposits, withdrawals, transfers)
-            - Mining operations and company information
-            Be friendly, informative, and use emojis appropriately. Always provide accurate information about commission rates, payment plans, and investment opportunities.`
+            systemContext: `You are Yawatu's AI assistant for LOGGED-IN USERS who are already shareholders and LIFETIME OWNERS.
+
+🌟 REMEMBER: These users are permanent co-owners of Yawatu who earn dividends for life!
+
+Help them with:
+- Share investments: Buy more shares from Dynamic Share Pool (UGX 20,000/share)
+- Share bookings: Reserve shares with flexible installment plans (25% down, 30 days to complete)
+- Referral program: Track 5% LIFETIME commission on all referrals' purchases and bookings
+- Wallet management: Multi-currency wallets (UGX/USD), deposits, withdrawals, transfers
+- Account verification: Complete profile for full platform access
+- Dividend tracking: Monitor lifetime earnings from ownership
+- Share trading: Sell or transfer shares, check buyback availability
+- Mining operations: Updates on company performance and operations
+- Voting rights: Participate in company decisions as owners
+
+Current Platform Info (2025):
+- Share price: UGX 20,000 per share
+- Payment methods: Mobile Money (MTN/Airtel), M-Pesa, Bank Transfer
+- Commission: 5% on all referral transactions (lifetime income)
+- Wallet currencies: UGX and USD
+- Account types: Individual, Joint, Company, Minor
+
+Emphasize OWNERSHIP and LIFETIME EARNINGS. Be friendly, use emojis, provide accurate information, and help them maximize their investment returns! 💎`
           },
           conversationHistory: messages.slice(-10)
         }
@@ -215,6 +232,24 @@ export const EnhancedChatBot: React.FC<EnhancedChatBotProps> = ({
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {/* Voice Toggle Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (isSpeechPlaying) {
+                stopSpeech();
+              }
+            }}
+            title={isSpeechPlaying ? 'Stop speaking' : 'Voice enabled'}
+          >
+            {isSpeechPlaying ? (
+              <VolumeX className="h-4 w-4 text-red-500" />
+            ) : (
+              <Volume2 className="h-4 w-4 text-green-600" />
+            )}
+          </Button>
+          
           {isSpeechPlaying && (
             <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
               <Volume2 className="h-3 w-3 mr-1 animate-pulse" />

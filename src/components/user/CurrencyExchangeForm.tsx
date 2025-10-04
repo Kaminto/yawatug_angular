@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ArrowRight } from 'lucide-react';
+import { useCurrencyExchange } from '@/hooks/useCurrencyExchange';
 
 interface CurrencyExchangeFormProps {
   userWallets: any[];
@@ -18,53 +19,58 @@ const CurrencyExchangeForm: React.FC<CurrencyExchangeFormProps> = ({
   userWallets,
   onExchangeComplete
 }) => {
-  const [fromCurrency, setFromCurrency] = useState('');
-  const [toCurrency, setToCurrency] = useState('');
+  const [fromWalletId, setFromWalletId] = useState('');
+  const [toWalletId, setToWalletId] = useState('');
   const [amount, setAmount] = useState('');
   const [exchangeRate, setExchangeRate] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [convertedAmount, setConvertedAmount] = useState(0);
+  const [feeAmount, setFeeAmount] = useState(0);
+  const { loading, getExchangeRate, calculateExchange, processExchange } = useCurrencyExchange();
 
-  const fromWallet = userWallets.find(w => w.currency === fromCurrency);
+  const fromWallet = userWallets.find(w => w.id === fromWalletId);
+  const toWallet = userWallets.find(w => w.id === toWalletId);
   const exchangeAmount = parseFloat(amount) || 0;
-  const convertedAmount = exchangeAmount * exchangeRate;
 
+  // Fetch exchange rate and calculate conversion when inputs change
   useEffect(() => {
-    if (fromCurrency && toCurrency && fromCurrency !== toCurrency) {
-      fetchExchangeRate();
+    if (fromWallet && toWallet && exchangeAmount > 0 && fromWallet.currency !== toWallet.currency) {
+      fetchAndCalculateExchange();
+    } else {
+      setExchangeRate(0);
+      setConvertedAmount(0);
+      setFeeAmount(0);
     }
-  }, [fromCurrency, toCurrency]);
+  }, [fromWalletId, toWalletId, amount]);
 
-  const fetchExchangeRate = async () => {
+  const fetchAndCalculateExchange = async () => {
+    if (!fromWallet || !toWallet) return;
+    
     try {
-      const { data, error } = await supabase
-        .from('exchange_rates')
-        .select('rate')
-        .eq('from_currency', fromCurrency)
-        .eq('to_currency', toCurrency)
-        .eq('is_active', true)
-        .single();
-
-      if (error || !data) {
-        // Default rates if not found
-        if (fromCurrency === 'USD' && toCurrency === 'UGX') {
-          setExchangeRate(3800);
-        } else if (fromCurrency === 'UGX' && toCurrency === 'USD') {
-          setExchangeRate(1/3800);
-        } else {
-          setExchangeRate(1);
-        }
-      } else {
-        setExchangeRate(data.rate);
-      }
+      const calculation = await calculateExchange(
+        exchangeAmount,
+        fromWallet.currency,
+        toWallet.currency
+      );
+      
+      setExchangeRate(calculation.rate);
+      setConvertedAmount(calculation.convertedAmount);
+      setFeeAmount(calculation.fee);
     } catch (error) {
-      console.error('Error fetching exchange rate:', error);
-      setExchangeRate(1);
+      console.error('Error calculating exchange:', error);
+      setExchangeRate(0);
+      setConvertedAmount(0);
+      setFeeAmount(0);
     }
   };
 
   const handleExchange = async () => {
-    if (!fromWallet || !exchangeAmount || !toCurrency) {
-      toast.error('Please fill in all required fields');
+    if (!fromWallet || !toWallet || !exchangeAmount) {
+      toast.error('Please select both wallets and enter an amount');
+      return;
+    }
+
+    if (fromWallet.currency === toWallet.currency) {
+      toast.error('Please select different currency wallets');
       return;
     }
 
@@ -73,39 +79,29 @@ const CurrencyExchangeForm: React.FC<CurrencyExchangeFormProps> = ({
       return;
     }
 
-    setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      await processExchange(
+        fromWallet.id,
+        toWallet.id,
+        exchangeAmount,
+        fromWallet.currency,
+        toWallet.currency
+      );
 
-      const { error } = await supabase
-        .from('currency_exchange_requests')
-        .insert({
-          user_id: user.id,
-          from_currency: fromCurrency,
-          to_currency: toCurrency,
-          from_amount: exchangeAmount,
-          to_amount: convertedAmount,
-          exchange_rate: exchangeRate,
-          status: 'pending'
-        });
-
-      if (error) throw error;
-
-      toast.success('Currency exchange request submitted successfully');
-      setFromCurrency('');
-      setToCurrency('');
+      setFromWalletId('');
+      setToWalletId('');
       setAmount('');
+      setExchangeRate(0);
+      setConvertedAmount(0);
+      setFeeAmount(0);
       onExchangeComplete();
     } catch (error: any) {
-      console.error('Error creating exchange request:', error);
-      toast.error(`Failed to create exchange request: ${error.message}`);
-    } finally {
-      setLoading(false);
+      console.error('Error processing exchange:', error);
+      toast.error(`Failed to process exchange: ${error.message}`);
     }
   };
 
-  const availableCurrencies = [...new Set(userWallets.map(w => w.currency))];
+  const availableTargetWallets = userWallets.filter(w => w.id !== fromWalletId);
 
   return (
     <Card>
@@ -116,42 +112,68 @@ const CurrencyExchangeForm: React.FC<CurrencyExchangeFormProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <Label>From Currency</Label>
-          <Select value={fromCurrency} onValueChange={setFromCurrency}>
+        {/* From Wallet */}
+        <div className="space-y-2">
+          <Label>From Wallet</Label>
+          <Select value={fromWalletId} onValueChange={setFromWalletId}>
             <SelectTrigger>
-              <SelectValue placeholder="Choose currency to exchange from" />
+              <SelectValue placeholder="Select source wallet" />
             </SelectTrigger>
-            <SelectContent>
-              {availableCurrencies.map((currency) => {
-                const wallet = userWallets.find(w => w.currency === currency);
-                return (
-                  <SelectItem key={currency} value={currency}>
-                    {currency} (Balance: {wallet?.balance.toLocaleString()})
+            <SelectContent position="popper" className="bg-background z-[1000] shadow-md border">
+              {userWallets.length > 0 ? (
+                userWallets.map((wallet) => (
+                  <SelectItem key={wallet.id} value={wallet.id}>
+                    <div className="flex items-center justify-between w-full gap-4">
+                      <span>{wallet.currency} Wallet</span>
+                      <Badge variant="outline">
+                        {wallet.currency} {wallet.balance?.toLocaleString() || '0'}
+                      </Badge>
+                    </div>
                   </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label>To Currency</Label>
-          <Select value={toCurrency} onValueChange={setToCurrency}>
-            <SelectTrigger>
-              <SelectValue placeholder="Choose currency to exchange to" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableCurrencies.filter(c => c !== fromCurrency).map((currency) => (
-                <SelectItem key={currency} value={currency}>
-                  {currency}
+                ))
+              ) : (
+                <SelectItem value="no-wallets" disabled>
+                  No wallets available
                 </SelectItem>
-              ))}
+              )}
             </SelectContent>
           </Select>
         </div>
 
-        <div>
+        {/* To Wallet */}
+        <div className="space-y-2">
+          <Label>To Wallet</Label>
+          <Select 
+            value={toWalletId} 
+            onValueChange={setToWalletId}
+            disabled={!fromWalletId}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={fromWalletId ? "Select target wallet" : "Select source wallet first"} />
+            </SelectTrigger>
+            <SelectContent position="popper" className="bg-background z-[1000] shadow-md border">
+              {availableTargetWallets.length > 0 ? (
+                availableTargetWallets.map((wallet) => (
+                  <SelectItem key={wallet.id} value={wallet.id}>
+                    <div className="flex items-center justify-between w-full gap-4">
+                      <span>{wallet.currency} Wallet</span>
+                      <Badge variant="outline">
+                        {wallet.currency} {wallet.balance?.toLocaleString() || '0'}
+                      </Badge>
+                    </div>
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="no-wallets" disabled>
+                  {fromWalletId ? 'No other wallets available' : 'Select source wallet first'}
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Amount */}
+        <div className="space-y-2">
           <Label>Amount to Exchange</Label>
           <Input
             type="number"
@@ -160,19 +182,21 @@ const CurrencyExchangeForm: React.FC<CurrencyExchangeFormProps> = ({
             onChange={(e) => setAmount(e.target.value)}
             step="0.01"
             min="0"
+            disabled={!fromWalletId || !toWalletId}
           />
         </div>
 
-        {fromCurrency && toCurrency && exchangeRate > 0 && (
+        {/* Exchange Rate Display */}
+        {fromWallet && toWallet && exchangeRate > 0 && (
           <div className="bg-muted p-3 rounded-lg space-y-2">
             <div className="flex justify-between text-sm">
               <span>Exchange Rate:</span>
-              <span>1 {fromCurrency} = {exchangeRate.toLocaleString()} {toCurrency}</span>
+              <span>1 {fromWallet.currency} = {exchangeRate.toLocaleString()} {toWallet.currency}</span>
             </div>
             {exchangeAmount > 0 && (
               <div className="flex justify-between text-sm font-medium border-t pt-2">
                 <span>You will receive:</span>
-                <span>{convertedAmount.toLocaleString()} {toCurrency}</span>
+                <span>{convertedAmount.toLocaleString()} {toWallet.currency}</span>
               </div>
             )}
           </div>
@@ -181,9 +205,16 @@ const CurrencyExchangeForm: React.FC<CurrencyExchangeFormProps> = ({
         <Button 
           onClick={handleExchange} 
           className="w-full"
-          disabled={loading || !fromCurrency || !toCurrency || !exchangeAmount || (fromWallet && fromWallet.balance < exchangeAmount)}
+          disabled={
+            loading || 
+            !fromWallet || 
+            !toWallet || 
+            !exchangeAmount || 
+            fromWallet.balance < exchangeAmount ||
+            fromWallet.currency === toWallet.currency
+          }
         >
-          {loading ? 'Processing...' : 'Submit Exchange Request'}
+          {loading ? 'Processing...' : 'Exchange Currency'}
         </Button>
       </CardContent>
     </Card>

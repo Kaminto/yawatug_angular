@@ -30,9 +30,11 @@ const handler = async (req: Request): Promise<Response> => {
     // Validate input
     if (!userId || !otp || !purpose) {
       return new Response(JSON.stringify({ 
+        success: false,
+        verified: false,
         error: 'Missing required fields: userId, otp, purpose' 
       }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -71,10 +73,11 @@ const handler = async (req: Request): Promise<Response> => {
     if (!otpRecords || otpRecords.length === 0) {
       console.log('No OTP records found for criteria')
       return new Response(JSON.stringify({ 
-        error: 'Invalid or expired verification code',
-        verified: false
+        success: false,
+        verified: false,
+        error: 'Invalid or expired verification code'
       }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -90,10 +93,11 @@ const handler = async (req: Request): Promise<Response> => {
       })));
       
       return new Response(JSON.stringify({ 
-        error: 'Invalid verification code',
-        verified: false
+        success: false,
+        verified: false,
+        error: 'Invalid verification code'
       }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -118,6 +122,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('OTP verified successfully for user:', userId, 'method:', otpRecord.verification_method)
 
     return new Response(JSON.stringify({ 
+      success: true,
       verified: true,
       message: 'Verification code verified successfully',
       verification_method: otpRecord.verification_method

@@ -608,6 +608,36 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_settings: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value: Json
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       admin_sub_wallets: {
         Row: {
           balance: number
@@ -1052,6 +1082,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      agent_chat_availability: {
+        Row: {
+          created_at: string | null
+          current_chat_count: number | null
+          id: string
+          is_online: boolean
+          last_seen: string | null
+          max_concurrent_chats: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_chat_count?: number | null
+          id?: string
+          is_online?: boolean
+          last_seen?: string | null
+          max_concurrent_chats?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_chat_count?: number | null
+          id?: string
+          is_online?: boolean
+          last_seen?: string | null
+          max_concurrent_chats?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       agent_clients: {
         Row: {
@@ -2161,6 +2224,146 @@ export type Database = {
           },
         ]
       }
+      chat_assignments: {
+        Row: {
+          accepted_at: string | null
+          assigned_at: string | null
+          assigned_to: string
+          completed_at: string | null
+          conversation_id: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          priority: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          assigned_at?: string | null
+          assigned_to: string
+          completed_at?: string | null
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          assigned_at?: string | null
+          assigned_to?: string
+          completed_at?: string | null
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_assignments_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "chatbot_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chatbot_configurations: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          system_instructions: string
+          updated_at: string | null
+          updated_by: string | null
+          user_type: string
+          voice_enabled: boolean | null
+          voice_speed: number | null
+          voice_type: string | null
+          welcome_message: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          system_instructions: string
+          updated_at?: string | null
+          updated_by?: string | null
+          user_type: string
+          voice_enabled?: boolean | null
+          voice_speed?: number | null
+          voice_type?: string | null
+          welcome_message: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          system_instructions?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          user_type?: string
+          voice_enabled?: boolean | null
+          voice_speed?: number | null
+          voice_type?: string | null
+          welcome_message?: string
+        }
+        Relationships: []
+      }
+      chatbot_conversations: {
+        Row: {
+          created_at: string | null
+          ended_at: string | null
+          escalated_to_human: boolean | null
+          escalation_reason: string | null
+          id: string
+          session_id: string
+          started_at: string | null
+          total_messages: number | null
+          updated_at: string | null
+          user_feedback_comment: string | null
+          user_feedback_rating: number | null
+          user_id: string | null
+          visitor_identifier: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          ended_at?: string | null
+          escalated_to_human?: boolean | null
+          escalation_reason?: string | null
+          id?: string
+          session_id: string
+          started_at?: string | null
+          total_messages?: number | null
+          updated_at?: string | null
+          user_feedback_comment?: string | null
+          user_feedback_rating?: number | null
+          user_id?: string | null
+          visitor_identifier?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          ended_at?: string | null
+          escalated_to_human?: boolean | null
+          escalation_reason?: string | null
+          id?: string
+          session_id?: string
+          started_at?: string | null
+          total_messages?: number | null
+          updated_at?: string | null
+          user_feedback_comment?: string | null
+          user_feedback_rating?: number | null
+          user_id?: string | null
+          visitor_identifier?: string | null
+        }
+        Relationships: []
+      }
       chatbot_knowledge: {
         Row: {
           answer: string
@@ -2170,6 +2373,7 @@ export type Database = {
           is_active: boolean | null
           keywords: string[] | null
           question: string
+          target_user_types: string[] | null
           updated_at: string
         }
         Insert: {
@@ -2180,6 +2384,7 @@ export type Database = {
           is_active?: boolean | null
           keywords?: string[] | null
           question: string
+          target_user_types?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -2190,7 +2395,85 @@ export type Database = {
           is_active?: boolean | null
           keywords?: string[] | null
           question?: string
+          target_user_types?: string[] | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      chatbot_messages: {
+        Row: {
+          content: string
+          conversation_id: string | null
+          created_at: string | null
+          id: string
+          message_type: string | null
+          metadata: Json | null
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          message_type?: string | null
+          metadata?: Json | null
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          message_type?: string | null
+          metadata?: Json | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatbot_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chatbot_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chatbot_quick_actions: {
+        Row: {
+          action_category: string | null
+          action_description: string | null
+          action_key: string
+          action_label: string
+          created_at: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          target_route: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          action_category?: string | null
+          action_description?: string | null
+          action_key: string
+          action_label: string
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          target_route?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          action_category?: string | null
+          action_description?: string | null
+          action_key?: string
+          action_label?: string
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          target_route?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -2834,6 +3117,133 @@ export type Database = {
           },
         ]
       }
+      credit_conversion_settings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          minimum_conversion_amount: number
+          shares_per_credit: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          minimum_conversion_amount?: number
+          shares_per_credit?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          minimum_conversion_amount?: number
+          shares_per_credit?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_conversion_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_conversion_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "credit_conversion_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_conversion_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          description: string | null
+          id: string
+          metadata: Json | null
+          source_id: string | null
+          source_type: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          source_id?: string | null
+          source_type?: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          source_id?: string | null
+          source_type?: string | null
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "credit_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       currency_conversion: {
         Row: {
           created_at: string
@@ -3165,6 +3575,221 @@ export type Database = {
             columns: ["wallet_id"]
             isOneToOne: false
             referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      draw_entries: {
+        Row: {
+          created_at: string
+          credits_staked: number
+          draw_id: string
+          entry_number: number
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_staked: number
+          draw_id: string
+          entry_number: number
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_staked?: number
+          draw_id?: string
+          entry_number?: number
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draw_entries_draw_id_fkey"
+            columns: ["draw_id"]
+            isOneToOne: false
+            referencedRelation: "grand_draws"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draw_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draw_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "draw_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draw_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      draw_settings: {
+        Row: {
+          auto_trigger_enabled: boolean
+          created_at: string
+          draw_frequency: string
+          first_prize_percentage: number
+          id: string
+          is_active: boolean
+          maximum_stake: number | null
+          minimum_stake: number
+          second_prize_percentage: number
+          third_prize_percentage: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_trigger_enabled?: boolean
+          created_at?: string
+          draw_frequency?: string
+          first_prize_percentage?: number
+          id?: string
+          is_active?: boolean
+          maximum_stake?: number | null
+          minimum_stake?: number
+          second_prize_percentage?: number
+          third_prize_percentage?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_trigger_enabled?: boolean
+          created_at?: string
+          draw_frequency?: string
+          first_prize_percentage?: number
+          id?: string
+          is_active?: boolean
+          maximum_stake?: number | null
+          minimum_stake?: number
+          second_prize_percentage?: number
+          third_prize_percentage?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draw_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draw_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "draw_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draw_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      draw_winners: {
+        Row: {
+          claimed: boolean
+          claimed_at: string | null
+          created_at: string
+          credits_staked: number
+          draw_id: string
+          id: string
+          position: number
+          prize_percentage: number
+          prize_shares: number
+          user_id: string
+        }
+        Insert: {
+          claimed?: boolean
+          claimed_at?: string | null
+          created_at?: string
+          credits_staked: number
+          draw_id: string
+          id?: string
+          position: number
+          prize_percentage: number
+          prize_shares: number
+          user_id: string
+        }
+        Update: {
+          claimed?: boolean
+          claimed_at?: string | null
+          created_at?: string
+          credits_staked?: number
+          draw_id?: string
+          id?: string
+          position?: number
+          prize_percentage?: number
+          prize_shares?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draw_winners_draw_id_fkey"
+            columns: ["draw_id"]
+            isOneToOne: false
+            referencedRelation: "grand_draws"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draw_winners_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draw_winners_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "draw_winners_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draw_winners_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
             referencedColumns: ["id"]
           },
         ]
@@ -3584,6 +4209,188 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      grand_draws: {
+        Row: {
+          created_at: string
+          draw_date: string
+          draw_name: string
+          draw_type: string
+          drawn_at: string | null
+          drawn_by: string | null
+          first_prize_percentage: number
+          first_prize_shares: number | null
+          first_winner_id: string | null
+          id: string
+          second_prize_percentage: number
+          second_prize_shares: number | null
+          second_winner_id: string | null
+          status: string
+          third_prize_percentage: number
+          third_prize_shares: number | null
+          third_winner_id: string | null
+          total_entries: number
+          total_staked_credits: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          draw_date: string
+          draw_name: string
+          draw_type?: string
+          drawn_at?: string | null
+          drawn_by?: string | null
+          first_prize_percentage?: number
+          first_prize_shares?: number | null
+          first_winner_id?: string | null
+          id?: string
+          second_prize_percentage?: number
+          second_prize_shares?: number | null
+          second_winner_id?: string | null
+          status?: string
+          third_prize_percentage?: number
+          third_prize_shares?: number | null
+          third_winner_id?: string | null
+          total_entries?: number
+          total_staked_credits?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          draw_date?: string
+          draw_name?: string
+          draw_type?: string
+          drawn_at?: string | null
+          drawn_by?: string | null
+          first_prize_percentage?: number
+          first_prize_shares?: number | null
+          first_winner_id?: string | null
+          id?: string
+          second_prize_percentage?: number
+          second_prize_shares?: number | null
+          second_winner_id?: string | null
+          status?: string
+          third_prize_percentage?: number
+          third_prize_shares?: number | null
+          third_winner_id?: string | null
+          total_entries?: number
+          total_staked_credits?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grand_draws_drawn_by_fkey"
+            columns: ["drawn_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_drawn_by_fkey"
+            columns: ["drawn_by"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "grand_draws_drawn_by_fkey"
+            columns: ["drawn_by"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_drawn_by_fkey"
+            columns: ["drawn_by"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_first_winner_id_fkey"
+            columns: ["first_winner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_first_winner_id_fkey"
+            columns: ["first_winner_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "grand_draws_first_winner_id_fkey"
+            columns: ["first_winner_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_first_winner_id_fkey"
+            columns: ["first_winner_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_second_winner_id_fkey"
+            columns: ["second_winner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_second_winner_id_fkey"
+            columns: ["second_winner_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "grand_draws_second_winner_id_fkey"
+            columns: ["second_winner_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_second_winner_id_fkey"
+            columns: ["second_winner_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_third_winner_id_fkey"
+            columns: ["third_winner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_third_winner_id_fkey"
+            columns: ["third_winner_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "grand_draws_third_winner_id_fkey"
+            columns: ["third_winner_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_draws_third_winner_id_fkey"
+            columns: ["third_winner_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       imported_user_invitations: {
         Row: {
@@ -5631,6 +6438,68 @@ export type Database = {
           },
         ]
       }
+      referral_credits: {
+        Row: {
+          available_credits: number
+          converted_credits: number
+          created_at: string
+          id: string
+          staked_credits: number
+          total_credits: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          available_credits?: number
+          converted_credits?: number
+          created_at?: string
+          id?: string
+          staked_credits?: number
+          total_credits?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          available_credits?: number
+          converted_credits?: number
+          created_at?: string
+          id?: string
+          staked_credits?: number
+          total_credits?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_credits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_credits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "referral_credits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_credits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_data_audit: {
         Row: {
           audit_type: string
@@ -5859,6 +6728,93 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_qualifications: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          qualified_at: string
+          referred_id: string
+          referrer_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          qualified_at?: string
+          referred_id: string
+          referrer_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          qualified_at?: string
+          referred_id?: string
+          referrer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_qualifications_referred_id_fkey"
+            columns: ["referred_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_qualifications_referred_id_fkey"
+            columns: ["referred_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "referral_qualifications_referred_id_fkey"
+            columns: ["referred_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_qualifications_referred_id_fkey"
+            columns: ["referred_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_qualifications_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_qualifications_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "referral_qualifications_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_qualifications_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_settings: {
         Row: {
           created_at: string
@@ -6058,6 +7014,83 @@ export type Database = {
             foreignKeyName: "referral_statistics_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_tier_settings: {
+        Row: {
+          commission_percentage: number | null
+          created_at: string
+          credits_per_trigger: number | null
+          eligibility_days: number | null
+          id: string
+          is_active: boolean
+          kyc_completion_required: number
+          level: number
+          level_name: string
+          reward_type: string
+          shares_per_credit_trigger: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          commission_percentage?: number | null
+          created_at?: string
+          credits_per_trigger?: number | null
+          eligibility_days?: number | null
+          id?: string
+          is_active?: boolean
+          kyc_completion_required?: number
+          level: number
+          level_name: string
+          reward_type: string
+          shares_per_credit_trigger?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          commission_percentage?: number | null
+          created_at?: string
+          credits_per_trigger?: number | null
+          eligibility_days?: number | null
+          id?: string
+          is_active?: boolean
+          kyc_completion_required?: number
+          level?: number
+          level_name?: string
+          reward_type?: string
+          shares_per_credit_trigger?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_tier_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_tier_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "referral_tier_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_tier_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
             referencedRelation: "verification_priority_queue"
             referencedColumns: ["id"]
           },
@@ -7441,7 +8474,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_share_sell_orders_share_id"
+            columns: ["share_id"]
+            isOneToOne: false
+            referencedRelation: "shares"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       share_selling_limits: {
         Row: {
@@ -8711,6 +9752,141 @@ export type Database = {
         }
         Relationships: []
       }
+      transaction_audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          created_by: string | null
+          details: Json | null
+          id: string
+          ip_address: string | null
+          transaction_id: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          created_by?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          transaction_id?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          created_by?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          transaction_id?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_audit_logs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "admin_transactions_unified"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "agent_transactions_unified"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "share_transactions_unified"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "user_transaction_history_unified"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transaction_fee_collections: {
         Row: {
           created_at: string | null
@@ -8922,6 +10098,34 @@ export type Database = {
             columns: ["wallet_id"]
             isOneToOne: false
             referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
             referencedColumns: ["id"]
           },
           {
@@ -10976,6 +12180,34 @@ export type Database = {
             referencedRelation: "verification_priority_queue"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
         ]
       }
       referral_user_summary: {
@@ -10993,6 +12225,73 @@ export type Database = {
           user_joined_at: string | null
         }
         Relationships: []
+      }
+      referrer_rankings: {
+        Row: {
+          rank: number | null
+          referrer_id: string | null
+          total_commissions: number | null
+          total_earnings: number | null
+          unique_referrals: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_referral_commissions_referrer"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_referral_commissions_referrer"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "fk_referral_commissions_referrer"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_referral_commissions_referrer"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_commissions_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_commissions_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "referral_commissions_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_commissions_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       security_dashboard: {
         Row: {
@@ -11020,7 +12319,36 @@ export type Database = {
           updated_at: string | null
           user_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transaction_summary: {
         Row: {
@@ -11036,7 +12364,36 @@ export type Database = {
           user_id: string | null
           user_name: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_financial_summary: {
         Row: {
@@ -11184,7 +12541,36 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "referral_user_summary"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profile_essentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "verification_priority_queue"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       verification_priority_queue: {
         Row: {
@@ -11269,6 +12655,10 @@ export type Database = {
           p_transaction_type: string
           p_user_id: string
         }
+        Returns: string
+      }
+      auto_assign_chat_to_agent: {
+        Args: { p_conversation_id: string }
         Returns: string
       }
       auto_close_expired_proposals: {
@@ -11412,6 +12802,10 @@ export type Database = {
         Args: { p_club_member_id: string }
         Returns: Json
       }
+      check_kyc_completion: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
       check_proposal_quorum: {
         Args: { p_proposal_id: string }
         Returns: Json
@@ -11447,6 +12841,10 @@ export type Database = {
       cleanup_orphaned_auth_users_db: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      complete_chat_assignment: {
+        Args: { p_assignment_id: string }
+        Returns: undefined
       }
       create_auth_account_for_imported_user: {
         Args: {
@@ -11616,7 +13014,7 @@ export type Database = {
         Returns: string
       }
       generate_referral_code: {
-        Args: { full_name: string; user_id: string }
+        Args: { p_full_name: string; p_user_id: string }
         Returns: string
       }
       generate_referral_code_yawatu_format: {
@@ -11848,6 +13246,10 @@ export type Database = {
         Args: { user_id?: string }
         Returns: boolean
       }
+      is_pool_purchase: {
+        Args: { p_transaction_id: string }
+        Returns: boolean
+      }
       link_referral_on_registration: {
         Args: { p_referrer_code: string; p_user_id: string }
         Returns: boolean
@@ -11909,6 +13311,18 @@ export type Database = {
           p_user_agent?: string
         }
         Returns: string
+      }
+      process_deposit_with_fee_separation: {
+        Args: {
+          p_currency: string
+          p_description?: string
+          p_fee_amount: number
+          p_gross_amount: number
+          p_reference?: string
+          p_user_id: string
+          p_wallet_id: string
+        }
+        Returns: Json
       }
       process_email_delivery_webhook: {
         Args: { p_provider_name: string; p_webhook_data: Json }
@@ -11984,6 +13398,21 @@ export type Database = {
           p_reference: string
           p_sender_user_id: string
           p_sender_wallet_id: string
+        }
+        Returns: Json
+      }
+      process_withdrawal_with_fee_split: {
+        Args: {
+          p_currency: string
+          p_description?: string
+          p_fee_amount: number
+          p_recipient_name?: string
+          p_recipient_phone?: string
+          p_reference?: string
+          p_user_id: string
+          p_wallet_id: string
+          p_withdrawal_amount: number
+          p_withdrawal_method?: string
         }
         Returns: Json
       }

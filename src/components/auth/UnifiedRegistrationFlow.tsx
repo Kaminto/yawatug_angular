@@ -10,6 +10,7 @@ import { toast } from '@/components/ui/use-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { RegistrationSuccess } from '@/components/auth/RegistrationSuccess';
 
 interface UnifiedRegistrationFlowProps {
   variant?: 'modal' | 'page';
@@ -23,6 +24,7 @@ export const UnifiedRegistrationFlow: React.FC<UnifiedRegistrationFlowProps> = (
   const [currentStep, setCurrentStep] = useState<'method' | 'details' | 'verification'>('method');
   const [registrationMethod, setRegistrationMethod] = useState<'email' | 'phone'>('email');
   const [isLoading, setIsLoading] = useState(false);
+  const [registrationNumber, setRegistrationNumber] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     phone: '',
@@ -111,9 +113,14 @@ export const UnifiedRegistrationFlow: React.FC<UnifiedRegistrationFlowProps> = (
         return;
       }
 
-      // Use AuthContext signUp method with proper metadata
+      // For phone-only registration, we still need an email for Supabase auth
+      // Use a standardized format that won't conflict with real emails
+      const authEmail = registrationMethod === 'email' 
+        ? formData.email 
+        : `phone+${formData.phone.replace(/[^\d]/g, '')}@yawatu.app`;
+
       const { error } = await signUp(
-        registrationMethod === 'email' ? formData.email : `${formData.phone}@temp.yawatu.com`,
+        authEmail,
         formData.password,
         formData.fullName,
         registrationMethod === 'phone' ? formData.phone : undefined,
@@ -136,6 +143,7 @@ export const UnifiedRegistrationFlow: React.FC<UnifiedRegistrationFlowProps> = (
           .single();
         
         if (profile?.referral_code) {
+          setRegistrationNumber(profile.referral_code);
           setFormData(prev => ({ ...prev, referralCode: profile.referral_code }));
         }
       }
@@ -311,62 +319,60 @@ export const UnifiedRegistrationFlow: React.FC<UnifiedRegistrationFlowProps> = (
     </div>
   );
 
-  const renderVerification = () => (
-    <div className="space-y-6 text-center">
-      <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-green-600">Account Created Successfully!</h2>
-        <p className="text-muted-foreground">
-          We've sent verification instructions to your {registrationMethod}.
-        </p>
-      </div>
-      
-      {/* Show referral code as marketing message */}
-      {formData.referralCode && (
-        <div className="bg-gradient-to-br from-primary/10 to-secondary/10 p-6 rounded-lg border-2 border-primary/20">
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground font-medium">
-              🎉 Your Registration Number
-            </p>
-            <div className="text-3xl font-bold text-primary">
-              {formData.referralCode}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              You are investor #{formData.referralCode.replace('YWT', '')} - Join thousands of members already investing in ethical gold mining!
-            </p>
-          </div>
+  const renderVerification = () => {
+    if (registrationNumber) {
+      return (
+        <RegistrationSuccess
+          registrationNumber={registrationNumber}
+          registrationMethod={registrationMethod}
+          email={registrationMethod === 'email' ? formData.email : undefined}
+          phone={registrationMethod === 'phone' ? formData.phone : undefined}
+          variant="modal"
+          onClose={() => navigate('/login')}
+        />
+      );
+    }
+
+    return (
+      <div className="space-y-6 text-center">
+        <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-green-600">Account Created Successfully!</h2>
+          <p className="text-muted-foreground">
+            We've sent verification instructions to your {registrationMethod}.
+          </p>
         </div>
-      )}
-      
-      <div className="bg-muted p-4 rounded-lg">
-        <p className="text-sm">
-          <strong>Next Steps:</strong>
-        </p>
-        <ol className="text-sm text-left mt-2 space-y-1 list-decimal list-inside">
-          <li>Check your {registrationMethod} for the verification message</li>
-          <li>Click the verification link to confirm your account</li>
-          <li>Complete your profile setup</li>
-          <li>Start investing in ethical gold mining</li>
-        </ol>
+        
+        <div className="bg-muted p-4 rounded-lg">
+          <p className="text-sm">
+            <strong>Next Steps:</strong>
+          </p>
+          <ol className="text-sm text-left mt-2 space-y-1 list-decimal list-inside">
+            <li>Check your {registrationMethod} for the verification message</li>
+            <li>Click the verification link to confirm your account</li>
+            <li>Complete your profile setup</li>
+            <li>Start investing in ethical gold mining</li>
+          </ol>
+        </div>
+        
+        <div className="flex space-x-3">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/login')}
+            className="flex-1"
+          >
+            Back to Login
+          </Button>
+          <Button
+            onClick={() => navigate('/verify-email', { state: { email: formData.email } })}
+            className="flex-1"
+          >
+            Check Email
+          </Button>
+        </div>
       </div>
-      
-      <div className="flex space-x-3">
-        <Button
-          variant="outline"
-          onClick={() => navigate('/login')}
-          className="flex-1"
-        >
-          Back to Login
-        </Button>
-        <Button
-          onClick={() => navigate('/verify-email', { state: { email: formData.email } })}
-          className="flex-1"
-        >
-          Check Email
-        </Button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const content = (
     <div className="w-full max-w-md mx-auto">

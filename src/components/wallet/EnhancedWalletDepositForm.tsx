@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 import { useTransactionFees } from '@/hooks/useTransactionFees';
 import { useAdminPaymentConfigurations } from '@/hooks/useAdminPaymentConfigurations';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { DepositPaymentStatusModal } from './DepositPaymentStatusModal';
+import DepositConfirmationDialog from './DepositConfirmationDialog';
 
 interface EnhancedWalletDepositFormProps {
   wallets: any[];
@@ -30,6 +32,11 @@ const EnhancedWalletDepositForm: React.FC<EnhancedWalletDepositFormProps> = ({
   const [paymentMethod, setPaymentMethod] = useState('mobile_money');
   const [loading, setLoading] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
+  const [showPaymentStatusModal, setShowPaymentStatusModal] = useState(false);
+  const [showDepositConfirmation, setShowDepositConfirmation] = useState(false);
+  const [currentTransactionId, setCurrentTransactionId] = useState<string | null>(null);
+  const [currentTransactionReference, setCurrentTransactionReference] = useState<string | null>(null);
+  const [currentDepositDetails, setCurrentDepositDetails] = useState<any>(null);
   
   const { 
     configurations, 
@@ -83,22 +90,24 @@ const EnhancedWalletDepositForm: React.FC<EnhancedWalletDepositFormProps> = ({
           return;
         }
 
-        const amountStr = amountNum.toFixed(2);
-        const confirmMsg = `Send deposit request of ${wallet!.currency} ${amountStr} to ${msisdn}?`;
-        if (!window.confirm(confirmMsg)) {
-          setLoading(false);
-          return;
-        }
+        const feeDetails = feeInfo?.totalFee || 0;
+        const totalAmount = amountNum + feeDetails;
+        const amountStr = totalAmount.toFixed(2); // Include fees in payment
 
         const reference = `DEP_${Date.now()}`;
+
+        // Open the payment status modal immediately with countdown
+        setCurrentTransactionReference(reference);
+        setShowPaymentStatusModal(true);
+
         const { data, error } = await supabase.functions.invoke('test-relworx-api', {
           body: {
             account_no: 'YEW2024A25E4R',
             reference,
             msisdn,
             currency: wallet!.currency,
-            amount: amountStr,
-            description: `Deposit to ${wallet!.currency} wallet via RelWorx`
+            amount: amountStr, // Total amount including fees
+            description: `Deposit to ${wallet!.currency} wallet via RelWorx (incl. fees)`
           }
         });
 
@@ -121,7 +130,7 @@ const EnhancedWalletDepositForm: React.FC<EnhancedWalletDepositFormProps> = ({
         }
 
         // Create transaction record
-        const { error: txError } = await supabase
+        const { data: txData, error: txError } = await supabase
           .from('transactions')
           .insert({
             user_id: user.id,
@@ -137,15 +146,33 @@ const EnhancedWalletDepositForm: React.FC<EnhancedWalletDepositFormProps> = ({
               phone_number: msisdn,
               provider_response: data.data
             }
-          });
+          })
+          .select()
+          .single();
 
         if (txError) {
           console.error('Transaction record error:', txError);
           toast.warning('Payment initiated but failed to log transaction. Contact support.');
         } else {
-          toast.success(`Deposit request sent to ${msisdn}. Complete payment on your phone to proceed.`, {
-            duration: 8000
+          // Show payment status modal
+          setCurrentTransactionId(txData.id);
+          setCurrentTransactionReference(reference);
+          setShowPaymentStatusModal(true);
+          
+          const feeDetails = feeInfo?.totalFee || 0;
+          
+          // Show deposit confirmation dialog
+          setCurrentDepositDetails({
+            amount: amountNum,
+            currency: wallet!.currency,
+            fee: feeDetails,
+            total: amountNum + feeDetails,
+            phoneNumber: msisdn,
+            method: 'mobile_money_relworx',
+            reference: reference,
+            status: 'processing'
           });
+          setShowDepositConfirmation(true);
         }
 
         setAmount('');
@@ -162,7 +189,7 @@ const EnhancedWalletDepositForm: React.FC<EnhancedWalletDepositFormProps> = ({
           merchantCode: '',
           transactionId: ''
         });
-        onDepositComplete();
+        // Don't call onDepositComplete here - let modal handle it
         return;
       }
 
@@ -177,6 +204,12 @@ const EnhancedWalletDepositForm: React.FC<EnhancedWalletDepositFormProps> = ({
         timestamp: new Date().toISOString()
       };
 
+      const reference = `DEP-${Date.now()}-${user.id.slice(0, 8)}`;
+
+      // Open the payment status modal immediately with countdown
+      setCurrentTransactionReference(reference);
+      setShowPaymentStatusModal(true);
+
       const { data: transaction, error: transactionError } = await supabase
         .from('transactions')
         .insert({
@@ -188,7 +221,7 @@ const EnhancedWalletDepositForm: React.FC<EnhancedWalletDepositFormProps> = ({
           status: 'pending',
           approval_status: 'pending',
           admin_notes: JSON.stringify(adminNotesData),
-          reference: `DEP-${Date.now()}-${user.id.slice(0, 8)}`
+          reference
         })
         .select()
         .single();
@@ -199,7 +232,25 @@ const EnhancedWalletDepositForm: React.FC<EnhancedWalletDepositFormProps> = ({
       }
 
       console.log('Deposit transaction created successfully:', transaction.id);
-      toast.success('Deposit request submitted successfully and is pending approval');
+      
+      // Show payment status modal for manual methods too
+      setCurrentTransactionId(transaction.id);
+      setCurrentTransactionReference(reference);
+      setShowPaymentStatusModal(true);
+      
+      const feeDetails = feeInfo?.totalFee || 0;
+      
+      // Show deposit confirmation dialog
+      setCurrentDepositDetails({
+        amount: amountNum,
+        currency: wallet!.currency,
+        fee: feeDetails,
+        total: amountNum + feeDetails,
+        method: paymentMethod,
+        reference: reference,
+        status: 'pending'
+      });
+      setShowDepositConfirmation(true);
       setAmount('');
       setPaymentDetails({
         phoneNumber: '',
@@ -214,7 +265,7 @@ const EnhancedWalletDepositForm: React.FC<EnhancedWalletDepositFormProps> = ({
         merchantCode: '',
         transactionId: ''
       });
-      onDepositComplete();
+      // Don't call onDepositComplete here - let modal handle it
     } catch (error: any) {
       console.error('Deposit error:', error);
       toast.error(error.message || 'Failed to process deposit');
@@ -628,6 +679,22 @@ const EnhancedWalletDepositForm: React.FC<EnhancedWalletDepositFormProps> = ({
           </Button>
         </form>
       </CardContent>
+
+      <DepositPaymentStatusModal
+        open={showPaymentStatusModal}
+        onOpenChange={setShowPaymentStatusModal}
+        transactionId={currentTransactionId}
+        transactionReference={currentTransactionReference}
+        onComplete={onDepositComplete}
+      />
+
+      {showDepositConfirmation && currentDepositDetails && (
+        <DepositConfirmationDialog
+          isOpen={showDepositConfirmation}
+          onClose={() => setShowDepositConfirmation(false)}
+          depositDetails={currentDepositDetails}
+        />
+      )}
     </Card>
   );
 };

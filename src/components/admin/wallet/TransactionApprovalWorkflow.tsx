@@ -34,6 +34,9 @@ interface PendingTransaction {
   admin_notes?: string;
   created_at: string;
   risk_score?: number;
+  fee_amount?: number;
+  net_amount?: number;
+  metadata?: any;
   user_profile?: {
     full_name: string;
     email: string;
@@ -72,11 +75,11 @@ const TransactionApprovalWorkflow: React.FC = () => {
     try {
       setLoading(true);
 
-      // Load pending transactions
+      // Load pending and auto-approved transactions (including instant mobile transactions)
       const { data: transactions, error } = await supabase
         .from('transactions')
         .select('*')
-        .eq('approval_status', 'pending')
+        .in('approval_status', ['pending', 'auto_approved'])
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -161,14 +164,21 @@ const TransactionApprovalWorkflow: React.FC = () => {
   const handleSingleApproval = async (transactionId: string, action: 'approve' | 'reject', notes?: string) => {
     setProcessing(transactionId);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('❌ Auth error:', authError);
+        throw new Error('Not authenticated');
+      }
+
+      console.log('✅ User authenticated:', user.id);
 
       const transaction = pendingTransactions.find(t => t.id === transactionId);
       if (!transaction) throw new Error('Transaction not found');
 
+      console.log(`🔄 Attempting to ${action} transaction:`, transactionId);
+
       // Update transaction status
-      const { error: updateError } = await supabase
+      const { data: updateData, error: updateError } = await supabase
         .from('transactions')
         .update({
           approval_status: action === 'approve' ? 'approved' : 'rejected',
@@ -177,19 +187,37 @@ const TransactionApprovalWorkflow: React.FC = () => {
           approved_at: new Date().toISOString(),
           admin_notes: notes || ''
         })
-        .eq('id', transactionId);
+        .eq('id', transactionId)
+        .select();
 
-      if (updateError) throw updateError;
+      console.log('📊 Update response:', { data: updateData, error: updateError });
+
+      if (updateError) {
+        console.error('❌ Update error:', updateError);
+        throw new Error(`Database update failed: ${updateError.message} (${updateError.code})`);
+      }
+
+      if (!updateData || updateData.length === 0) {
+        console.error('⚠️ No rows updated - possible RLS policy issue');
+        throw new Error('Transaction update failed - insufficient permissions or transaction not found');
+      }
+
+      console.log('✅ Transaction updated successfully:', updateData);
 
       // If approved, update wallet balance
       if (action === 'approve') {
+        console.log('💰 Updating wallet balance...');
         await updateWalletBalance(transaction);
       }
 
       toast.success(`Transaction ${action}d successfully`);
-      loadPendingTransactions();
+      await loadPendingTransactions();
     } catch (error: any) {
-      console.error(`Error ${action}ing transaction:`, error);
+      console.error(`❌ Error ${action}ing transaction:`, {
+        error,
+        message: error.message,
+        details: error
+      });
       toast.error(`Failed to ${action} transaction: ${error.message}`);
     } finally {
       setProcessing(null);
@@ -498,23 +526,36 @@ const TransactionApprovalCard: React.FC<TransactionApprovalCardProps> = ({
             <p className="font-medium text-foreground">{transaction.user_profile?.full_name}</p>
             <p className="text-sm text-muted-foreground">{transaction.user_profile?.email}</p>
             {getRiskBadge(transaction.risk_score || 0)}
+            {transaction.approval_status === 'auto_approved' && (
+              <Badge variant="secondary" className="ml-2">
+                Auto-Approved
+              </Badge>
+            )}
             <Badge variant="outline" className="capitalize">
               {transaction.transaction_type}
             </Badge>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm mb-3">
             <div>
-              <p className="text-muted-foreground">Amount</p>
+              <p className="text-muted-foreground">Gross Amount</p>
               <p className="font-medium">{transaction.currency} {transaction.amount.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Transaction Fee</p>
+              <p className="font-medium text-orange-600">
+                {transaction.currency} {(transaction.fee_amount || 0).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Net Amount</p>
+              <p className="font-medium text-green-600">
+                {transaction.currency} {((transaction.amount || 0) - (transaction.fee_amount || 0)).toLocaleString()}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground">Date</p>
               <p className="font-medium">{new Date(transaction.created_at).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Risk Score</p>
-              <p className="font-medium">{transaction.risk_score || 0}%</p>
             </div>
             <div>
               <p className="text-muted-foreground">Reference</p>

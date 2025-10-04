@@ -41,8 +41,13 @@ const WalletActionsModal: React.FC<WalletActionsModalProps> = ({
   onClose,
   onUpdate
 }) => {
-  const [adjustmentAmount, setAdjustmentAmount] = useState('');
-  const [adjustmentReason, setAdjustmentReason] = useState('');
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositNotes, setDepositNotes] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawNotes, setWithdrawNotes] = useState('');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferNotes, setTransferNotes] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
   const [processing, setProcessing] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
@@ -74,8 +79,8 @@ const WalletActionsModal: React.FC<WalletActionsModalProps> = ({
     }
   };
 
-  const handleBalanceAdjustment = async (type: 'add' | 'subtract') => {
-    if (!wallet || !adjustmentAmount || !adjustmentReason) {
+  const handleDeposit = async () => {
+    if (!wallet || !depositAmount || !depositNotes) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -85,24 +90,8 @@ const WalletActionsModal: React.FC<WalletActionsModalProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const amount = parseFloat(adjustmentAmount);
-      const adjustedAmount = type === 'subtract' ? -amount : amount;
-
-      // Check if subtraction would result in negative balance
-      if (type === 'subtract' && wallet.balance < amount) {
-        throw new Error('Insufficient balance for this adjustment');
-      }
-
-      // Update wallet balance
-      const { error: walletError } = await supabase
-        .from('wallets')
-        .update({ 
-          balance: wallet.balance + adjustedAmount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', wallet.id);
-
-      if (walletError) throw walletError;
+      const amount = parseFloat(depositAmount);
+      if (amount <= 0) throw new Error('Amount must be greater than 0');
 
       // Create transaction record
       const { error: transactionError } = await supabase
@@ -110,24 +99,160 @@ const WalletActionsModal: React.FC<WalletActionsModalProps> = ({
         .insert({
           user_id: wallet.user_id,
           wallet_id: wallet.id,
-          transaction_type: 'admin_adjustment',
-          amount: adjustedAmount,
+          transaction_type: 'deposit',
+          amount: amount,
           currency: wallet.currency,
           status: 'completed',
           approval_status: 'approved',
-          admin_notes: `Admin balance adjustment: ${adjustmentReason}`,
-          reference: `ADJ-${Date.now()}`,
+          admin_notes: `Admin deposit: ${depositNotes}`,
+          reference: `DEP-${Date.now()}`,
+          description: `Admin deposit to wallet`,
         });
 
       if (transactionError) throw transactionError;
 
-      toast.success(`Balance ${type === 'add' ? 'increased' : 'decreased'} successfully`);
-      setAdjustmentAmount('');
-      setAdjustmentReason('');
+      toast.success('Deposit completed successfully');
+      setDepositAmount('');
+      setDepositNotes('');
       onUpdate();
+      loadTransactionHistory();
     } catch (error: any) {
-      console.error('Error adjusting balance:', error);
-      toast.error(error.message || 'Failed to adjust balance');
+      console.error('Error processing deposit:', error);
+      toast.error(error.message || 'Failed to process deposit');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!wallet || !withdrawAmount || !withdrawNotes) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const amount = parseFloat(withdrawAmount);
+      if (amount <= 0) throw new Error('Amount must be greater than 0');
+      if (wallet.balance < amount) throw new Error('Insufficient balance for withdrawal');
+
+      // Create transaction record (negative amount for withdrawal)
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: wallet.user_id,
+          wallet_id: wallet.id,
+          transaction_type: 'withdraw',
+          amount: -amount,
+          currency: wallet.currency,
+          status: 'completed',
+          approval_status: 'approved',
+          admin_notes: `Admin withdrawal: ${withdrawNotes}`,
+          reference: `WTH-${Date.now()}`,
+          description: `Admin withdrawal from wallet`,
+        });
+
+      if (transactionError) throw transactionError;
+
+      toast.success('Withdrawal completed successfully');
+      setWithdrawAmount('');
+      setWithdrawNotes('');
+      onUpdate();
+      loadTransactionHistory();
+    } catch (error: any) {
+      console.error('Error processing withdrawal:', error);
+      toast.error(error.message || 'Failed to process withdrawal');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!wallet || !transferAmount || !transferNotes || !recipientEmail) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const amount = parseFloat(transferAmount);
+      if (amount <= 0) throw new Error('Amount must be greater than 0');
+      if (wallet.balance < amount) throw new Error('Insufficient balance for transfer');
+
+      // Find recipient by email
+      const { data: recipientProfile, error: recipientError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', recipientEmail)
+        .single();
+
+      if (recipientError || !recipientProfile) {
+        throw new Error('Recipient user not found');
+      }
+
+      // Find recipient wallet
+      const { data: recipientWallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('id')
+        .eq('user_id', recipientProfile.id)
+        .eq('currency', wallet.currency)
+        .single();
+
+      if (walletError || !recipientWallet) {
+        throw new Error(`Recipient does not have a ${wallet.currency} wallet`);
+      }
+
+      // Create sender transaction (negative amount)
+      const { error: senderTransactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: wallet.user_id,
+          wallet_id: wallet.id,
+          transaction_type: 'transfer',
+          amount: -amount,
+          currency: wallet.currency,
+          status: 'completed',
+          approval_status: 'approved',
+          admin_notes: `Admin transfer to ${recipientEmail}: ${transferNotes}`,
+          reference: `TRF-${Date.now()}`,
+          description: `Admin transfer to ${recipientEmail}`,
+        });
+
+      if (senderTransactionError) throw senderTransactionError;
+
+      // Create recipient transaction (positive amount)
+      const { error: recipientTransactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: recipientProfile.id,
+          wallet_id: recipientWallet.id,
+          transaction_type: 'transfer',
+          amount: amount,
+          currency: wallet.currency,
+          status: 'completed',
+          approval_status: 'approved',
+          admin_notes: `Admin transfer from ${wallet.user.email}: ${transferNotes}`,
+          reference: `TRF-${Date.now()}`,
+          description: `Admin transfer from ${wallet.user.email}`,
+        });
+
+      if (recipientTransactionError) throw recipientTransactionError;
+
+      toast.success('Transfer completed successfully');
+      setTransferAmount('');
+      setTransferNotes('');
+      setRecipientEmail('');
+      onUpdate();
+      loadTransactionHistory();
+    } catch (error: any) {
+      console.error('Error processing transfer:', error);
+      toast.error(error.message || 'Failed to process transfer');
     } finally {
       setProcessing(false);
     }
@@ -144,7 +269,7 @@ const WalletActionsModal: React.FC<WalletActionsModalProps> = ({
         .eq('user_id', wallet.user_id)
         .eq('currency', wallet.currency)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (error) throw error;
       setTransactions(data || []);
@@ -175,11 +300,12 @@ const WalletActionsModal: React.FC<WalletActionsModalProps> = ({
         </DialogHeader>
 
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="adjust">Adjust</TabsTrigger>
+            <TabsTrigger value="deposit">Deposit</TabsTrigger>
+            <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
+            <TabsTrigger value="transfer">Transfer</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
-            <TabsTrigger value="user">User Info</TabsTrigger>
           </TabsList>
 
           <TabsContent value="details" className="space-y-4">
@@ -237,57 +363,154 @@ const WalletActionsModal: React.FC<WalletActionsModalProps> = ({
             </Card>
           </TabsContent>
 
-          <TabsContent value="adjust" className="space-y-4">
+          <TabsContent value="deposit" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Balance Adjustment
-                </CardTitle>
+                <CardTitle className="text-lg">Deposit to Wallet</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <Label>Current Balance</Label>
-                  <p className="text-xl font-bold">
+                  <p className="text-xl font-bold text-green-600">
                     {wallet.currency} {wallet.balance.toLocaleString()}
                   </p>
                 </div>
 
                 <div>
-                  <Label>Adjustment Amount</Label>
+                  <Label>Deposit Amount *</Label>
                   <Input
                     type="number"
-                    placeholder="Enter amount"
-                    value={adjustmentAmount}
-                    onChange={(e) => setAdjustmentAmount(e.target.value)}
+                    placeholder="Enter deposit amount"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    min="0"
+                    step="0.01"
                   />
                 </div>
 
                 <div>
-                  <Label>Reason for Adjustment</Label>
+                  <Label>Notes *</Label>
                   <Textarea
-                    placeholder="Explain the reason for this balance adjustment..."
-                    value={adjustmentReason}
-                    onChange={(e) => setAdjustmentReason(e.target.value)}
+                    placeholder="Reason for deposit (e.g., Refund, Bonus, Correction)..."
+                    value={depositNotes}
+                    onChange={(e) => setDepositNotes(e.target.value)}
+                    rows={3}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <Button
-                    onClick={() => handleBalanceAdjustment('add')}
-                    disabled={processing || !adjustmentAmount || !adjustmentReason}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    Add Amount
-                  </Button>
-                  <Button
-                    onClick={() => handleBalanceAdjustment('subtract')}
-                    disabled={processing || !adjustmentAmount || !adjustmentReason}
-                    variant="destructive"
-                  >
-                    Subtract Amount
-                  </Button>
+                <Button
+                  onClick={handleDeposit}
+                  disabled={processing || !depositAmount || !depositNotes}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  Process Deposit
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="withdraw" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Withdraw from Wallet</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Current Balance</Label>
+                  <p className="text-xl font-bold text-green-600">
+                    {wallet.currency} {wallet.balance.toLocaleString()}
+                  </p>
                 </div>
+
+                <div>
+                  <Label>Withdrawal Amount *</Label>
+                  <Input
+                    type="number"
+                    placeholder="Enter withdrawal amount"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                <div>
+                  <Label>Notes *</Label>
+                  <Textarea
+                    placeholder="Reason for withdrawal (e.g., Correction, Penalty)..."
+                    value={withdrawNotes}
+                    onChange={(e) => setWithdrawNotes(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleWithdraw}
+                  disabled={processing || !withdrawAmount || !withdrawNotes}
+                  variant="destructive"
+                  className="w-full"
+                >
+                  Process Withdrawal
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="transfer" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Transfer to Another User</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Current Balance</Label>
+                  <p className="text-xl font-bold text-green-600">
+                    {wallet.currency} {wallet.balance.toLocaleString()}
+                  </p>
+                </div>
+
+                <div>
+                  <Label>Recipient Email *</Label>
+                  <Input
+                    type="email"
+                    placeholder="recipient@example.com"
+                    value={recipientEmail}
+                    onChange={(e) => setRecipientEmail(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Recipient must have a {wallet.currency} wallet
+                  </p>
+                </div>
+
+                <div>
+                  <Label>Transfer Amount *</Label>
+                  <Input
+                    type="number"
+                    placeholder="Enter transfer amount"
+                    value={transferAmount}
+                    onChange={(e) => setTransferAmount(e.target.value)}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                <div>
+                  <Label>Notes *</Label>
+                  <Textarea
+                    placeholder="Reason for transfer..."
+                    value={transferNotes}
+                    onChange={(e) => setTransferNotes(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleTransfer}
+                  disabled={processing || !transferAmount || !transferNotes || !recipientEmail}
+                  className="w-full"
+                >
+                  Process Transfer
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -297,22 +520,22 @@ const WalletActionsModal: React.FC<WalletActionsModalProps> = ({
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <History className="h-5 w-5" />
-                  Recent Transactions
+                  Recent Transactions (Last 20)
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {transactionsLoading ? (
                   <div className="animate-pulse">Loading transactions...</div>
                 ) : transactions.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
                     {transactions.map((transaction: any) => (
                       <div key={transaction.id} className="border rounded-lg p-3">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-medium">{transaction.transaction_type}</p>
-                             <p className="text-sm text-muted-foreground">
-                               {transaction.admin_notes || transaction.reference}
-                             </p>
+                            <p className="font-medium capitalize">{transaction.transaction_type.replace('_', ' ')}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {transaction.admin_notes || transaction.description || transaction.reference}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                               {new Date(transaction.created_at).toLocaleString()}
                             </p>
@@ -336,41 +559,6 @@ const WalletActionsModal: React.FC<WalletActionsModalProps> = ({
                     No transactions found
                   </p>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="user" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  User Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <Label className="text-sm font-medium">Full Name</Label>
-                    <p className="text-lg">{wallet.user.full_name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Email</Label>
-                    <p>{wallet.user.email}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Phone</Label>
-                    <p>{wallet.user.phone || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Account Status</Label>
-                    <div>
-                      <Badge variant={wallet.user.status === 'active' ? 'default' : 'destructive'}>
-                        {wallet.user.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>

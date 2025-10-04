@@ -125,16 +125,17 @@ serve(async (req: Request) => {
         updated_at: new Date().toISOString()
       };
 
-      if (response.ok && responseData.success) {
+      const successFlag = response.ok && ((responseData?.success === true) || (responseData?.data?.success === true));
+      if (successFlag) {
         updateData.status = operation === 'deposit' ? 'completed' : 'processing';
-        updateData.gateway_reference = responseData.reference || reference;
+        updateData.gateway_reference = responseData.reference || responseData?.data?.reference || reference;
         updateData.metadata = {
           simples_response: responseData,
           response_time_ms: responseTime
         };
       } else {
         updateData.status = 'failed';
-        updateData.admin_notes = `SimpleLes API error: ${responseData.message || 'Unknown error'}`;
+        updateData.admin_notes = `SimpleLes API error: ${responseData?.message || responseData?.data?.message || 'Unknown error'}`;
       }
 
       await supabaseClient

@@ -250,7 +250,7 @@ export default function WalletSecurityVerification({
         throw new Error(verificationError.message || 'Failed to verify OTP');
       }
 
-      if (verificationResult?.verified) {
+      if (verificationResult?.success && verificationResult?.verified) {
         toast.success('Verification successful');
         onVerified({ otp: otpCode, pin: pin || undefined });
       } else {

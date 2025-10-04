@@ -56,6 +56,10 @@ export const useReferralTracking = () => {
       const commissionRate = settingData?.setting_value || 0.05;
       const commissionAmount = transactionAmount * commissionRate;
 
+      // Determine commission status: 'paid' for full share purchases, 'pending' for others
+      const isPaidImmediately = transactionType === 'share_purchase';
+      const commissionStatus = isPaidImmediately ? 'paid' : 'pending';
+
       // Create referral commission record
       const { error: commissionError } = await supabase
         .from('referral_commissions')
@@ -67,7 +71,8 @@ export const useReferralTracking = () => {
           source_amount: transactionAmount,
           earning_type: transactionType,
           currency,
-          status: 'pending'
+          status: commissionStatus,
+          paid_at: isPaidImmediately ? new Date().toISOString() : null
         });
 
       if (commissionError) throw commissionError;
@@ -90,8 +95,8 @@ export const useReferralTracking = () => {
 
       if (activityError) throw activityError;
 
-      // Update referrer's statistics - just increment pending earnings
-      const { data: currentStats, error: statsReadError } = await supabase
+      // Update referrer's statistics
+      const { data: currentStats } = await supabase
         .from('referral_statistics')
         .select('pending_earnings, total_earnings')
         .eq('user_id', referrerId)
@@ -104,7 +109,7 @@ export const useReferralTracking = () => {
         .from('referral_statistics')
         .upsert({
           user_id: referrerId,
-          pending_earnings: currentPending + commissionAmount,
+          pending_earnings: isPaidImmediately ? currentPending : currentPending + commissionAmount,
           total_earnings: currentTotal + commissionAmount,
           updated_at: new Date().toISOString(),
           last_activity_at: new Date().toISOString()

@@ -19,7 +19,7 @@ import EnhancedUserVerificationQueue from './EnhancedUserVerificationQueue';
 import EnhancedUserEditRequests from './EnhancedUserEditRequests';
 import EnhancedProfileImporter from './EnhancedProfileImporter';
 import ImportedUserManager from '../ImportedUserManager';
-import AuthProfileSyncManager from '../AuthProfileSyncManager';
+import ComprehensiveSyncDashboard from './ComprehensiveSyncDashboard';
 
 interface DashboardStats {
   total_users: number;
@@ -385,7 +385,7 @@ const EnhancedAdminUsersPage = () => {
             </TabsContent>
 
             <TabsContent value="sync" className="space-y-6">
-              <AuthProfileSyncManager />
+              <ComprehensiveSyncDashboard onRefresh={loadDashboardData} />
             </TabsContent>
           </div>
         </Tabs>

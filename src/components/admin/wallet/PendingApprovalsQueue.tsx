@@ -21,6 +21,8 @@ interface PendingTransaction {
   reference?: string;
   admin_notes?: string;
   created_at: string;
+  fee_amount?: number;
+  metadata?: any;
   user_profile?: {
     full_name: string;
     email: string;
@@ -46,11 +48,11 @@ const PendingApprovalsQueue: React.FC<PendingApprovalsQueueProps> = ({
   }, []);
   const loadPendingTransactions = async () => {
     try {
-      // Get transactions with pending approval
+      // Get transactions with pending or auto-approved status (including instant mobile transactions)
       const {
         data: transactions,
         error: transError
-      } = await supabase.from('transactions').select('*').eq('approval_status', 'pending').order('created_at', {
+      } = await supabase.from('transactions').select('*').in('approval_status', ['pending', 'auto_approved']).order('created_at', {
         ascending: false
       });
       if (transError) {
@@ -204,10 +206,35 @@ const PendingApprovalsQueue: React.FC<PendingApprovalsQueueProps> = ({
                             <Badge variant="outline" className="capitalize">
                               {transaction.transaction_type}
                             </Badge>
-                            <span className="text-sm font-medium text-foreground">
-                              {formatAmount(transaction.amount, transaction.currency)}
-                            </span>
+                            {transaction.approval_status === 'auto_approved' && (
+                              <Badge variant="secondary">
+                                Auto-Approved
+                              </Badge>
+                            )}
                           </div>
+                          
+                          {/* Fee Breakdown */}
+                          <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                            <div>
+                              <p className="text-muted-foreground">Gross Amount</p>
+                              <span className="font-medium text-foreground">
+                                {formatAmount(transaction.amount, transaction.currency)}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Transaction Fee</p>
+                              <span className="font-medium text-orange-600">
+                                {formatAmount(transaction.fee_amount || 0, transaction.currency)}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Net Amount</p>
+                              <span className="font-medium text-green-600">
+                                {formatAmount((transaction.amount || 0) - (transaction.fee_amount || 0), transaction.currency)}
+                              </span>
+                            </div>
+                          </div>
+                          
                           <div className="flex flex-col gap-1 mt-1">
                             <p className="text-xs text-muted-foreground">
                               Method: {paymentInfo.method.replace('_', ' ')}

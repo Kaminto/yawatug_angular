@@ -24,7 +24,13 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { action, email, phone, token, password }: RequestBody = await req.json();
+    const reqBody: any = await req.json();
+
+    const action: 'check' | 'activate' = reqBody.action;
+    const email: string | undefined = reqBody.email?.toLowerCase();
+    const phone: string | undefined = reqBody.phone;
+    const token: string | undefined = reqBody.token || reqBody.activation_token; // accept legacy key
+    const password: string | undefined = reqBody.password;
 
     if (action === 'check') {
       // Use the database function to check user status
@@ -69,12 +75,22 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       const userId = validation.user_id;
-      const userEmail = validation.profile?.email;
+      let userEmail: string | null = (validation as any)?.email || (validation as any)?.profile?.email || email || null;
+
+      // Fallback: fetch from profiles if still missing
+      if (!userEmail) {
+        const { data: profileRow } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', userId)
+          .maybeSingle();
+        userEmail = profileRow?.email ?? null;
+      }
 
       if (!userEmail) {
         return new Response(JSON.stringify({
           success: false,
-          error: 'User email not found in profile'
+          error: 'User email not found for activation'
         }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -103,11 +119,10 @@ const handler = async (req: Request): Promise<Response> => {
         });
       }
 
-      // Update the profile to link with auth user
+      // Update the profile without changing the primary key to avoid FK issues
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          id: authUser.user.id, // Link profile to auth user
           account_activation_status: 'activated',
           auth_created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -126,6 +141,30 @@ const handler = async (req: Request): Promise<Response> => {
           status: 500,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
+      }
+
+      // Create default wallets for the user (UGX and USD)
+      const { error: walletError } = await supabase
+        .from('wallets')
+        .insert([
+          {
+            user_id: userId,
+            currency: 'UGX',
+            balance: 0,
+            status: 'active'
+          },
+          {
+            user_id: userId,
+            currency: 'USD',
+            balance: 0,
+            status: 'active'
+          }
+        ]);
+
+      if (walletError) {
+        console.error('Wallet creation error:', walletError);
+        // Don't fail the activation if wallet creation fails
+        // Wallets can be created manually later if needed
       }
 
       // Mark invitation as used

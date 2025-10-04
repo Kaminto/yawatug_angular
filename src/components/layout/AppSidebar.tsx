@@ -32,7 +32,8 @@ import {
   Vote,
   Activity,
   User,
-  LogOut
+  LogOut,
+  Headphones
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -53,6 +54,11 @@ const menuItems = [
     label: 'Users', 
     href: '/admin/users', 
     icon: Users 
+  },
+  { 
+    label: 'Agent Chats', 
+    href: '/admin/agent-chats', 
+    icon: MessageSquare 
   },
   { 
     label: 'Wallet', 
@@ -82,7 +88,7 @@ const menuItems = [
   { 
     label: 'Support', 
     href: '/admin/support', 
-    icon: MessageSquare 
+    icon: Headphones 
   },
   { 
     label: 'Promotions', 

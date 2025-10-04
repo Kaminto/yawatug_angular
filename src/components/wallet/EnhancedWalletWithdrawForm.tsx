@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTransactionFees } from '@/hooks/useTransactionFees';
 import WalletSecurityVerification from './WalletSecurityVerification';
+import TransactionStatusTracker from './TransactionStatusTracker';
+import WithdrawalConfirmationDialog from './WithdrawalConfirmationDialog';
 
 interface EnhancedWalletWithdrawFormProps {
   wallets: any[];
@@ -29,6 +31,9 @@ const EnhancedWalletWithdrawForm: React.FC<EnhancedWalletWithdrawFormProps> = ({
   const [withdrawalMethod, setWithdrawalMethod] = useState('mobile_money');
   const [loading, setLoading] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
+  const [showWithdrawalConfirmation, setShowWithdrawalConfirmation] = useState(false);
+  const [showStatusTracker, setShowStatusTracker] = useState(false);
+  const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [withdrawalDetails, setWithdrawalDetails] = useState({
     phoneNumber: '',
     accountName: '',
@@ -63,7 +68,13 @@ const EnhancedWalletWithdrawForm: React.FC<EnhancedWalletWithdrawFormProps> = ({
       return;
     }
 
-    // Show security verification
+    // Show withdrawal confirmation dialog
+    setShowWithdrawalConfirmation(true);
+  };
+
+  const handleConfirmWithdrawal = () => {
+    setShowWithdrawalConfirmation(false);
+    // Show security verification after confirmation
     setShowVerification(true);
   };
 
@@ -77,14 +88,33 @@ const EnhancedWalletWithdrawForm: React.FC<EnhancedWalletWithdrawFormProps> = ({
         body: {
           amount: amountNum,
           currency: wallet.currency,
-          description: `Withdrawal via ${withdrawalMethod}`
+          withdrawalMethod: withdrawalMethod,
+          description: `Withdrawal via ${withdrawalMethod}`,
+          phoneNumber: withdrawalDetails.phoneNumber || undefined
         }
       });
 
       if (error) throw error;
 
       if (data.success) {
-        toast.success('Withdrawal request submitted successfully!');
+        // Show status tracker instead of immediate success
+        const transaction = data.transaction;
+        setCurrentTransaction({
+          id: transaction.id,
+          type: 'withdrawal',
+          amount: transaction.amount,
+          currency: transaction.currency,
+          status: 'processing',
+          method: withdrawalMethod,
+          reference: transaction.reference,
+          created_at: new Date().toISOString(),
+          estimated_completion: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 minutes
+          fee: transaction.fee_amount
+        });
+        setShowStatusTracker(true);
+        
+        toast.info('Withdrawal initiated. Please wait for confirmation...', { duration: 5000 });
+        
         setAmount('');
         setWithdrawalDetails({
           phoneNumber: '',
@@ -95,7 +125,6 @@ const EnhancedWalletWithdrawForm: React.FC<EnhancedWalletWithdrawFormProps> = ({
           mobileMoneyType: '',
           network: ''
         });
-        onWithdrawComplete();
       } else {
         const msg = data.message || data.error || 'Withdrawal failed';
         toast.error(msg);
@@ -109,8 +138,21 @@ const EnhancedWalletWithdrawForm: React.FC<EnhancedWalletWithdrawFormProps> = ({
     }
   };
 
+  const handleStatusTrackerClose = () => {
+    setShowStatusTracker(false);
+    setCurrentTransaction(null);
+    onWithdrawComplete();
+  };
+
   return (
     <>
+      {showStatusTracker && currentTransaction && (
+        <TransactionStatusTracker
+          transaction={currentTransaction}
+          onClose={handleStatusTrackerClose}
+        />
+      )}
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -433,6 +475,24 @@ const EnhancedWalletWithdrawForm: React.FC<EnhancedWalletWithdrawFormProps> = ({
           </form>
         </CardContent>
       </Card>
+
+      {showWithdrawalConfirmation && (
+        <WithdrawalConfirmationDialog
+          isOpen={showWithdrawalConfirmation}
+          onClose={() => setShowWithdrawalConfirmation(false)}
+          onConfirm={handleConfirmWithdrawal}
+          withdrawalDetails={{
+            amount: totalAmount,
+            currency: wallet?.currency || '',
+            fee: feeInfo?.totalFee || 0,
+            netAmount: amountNum,
+            phoneNumber: withdrawalDetails.phoneNumber,
+            accountName: withdrawalDetails.accountName,
+            method: withdrawalMethod
+          }}
+          loading={loading}
+        />
+      )}
 
       {showVerification && (
         <WalletSecurityVerification

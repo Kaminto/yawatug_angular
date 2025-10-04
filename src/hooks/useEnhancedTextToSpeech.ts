@@ -13,6 +13,14 @@ export interface VoiceSettings {
 }
 
 const ELEVENLABS_VOICES = {
+  // African Accent Voices (Natural & Recommended)
+  'Freya (Nigerian)': 'jsCqWAovK2LkecY7zXl4',
+  'Seraphina (South African)': 'EXAVITQu4vr4xnSDxMaL',
+  'Adam (African English)': 'pNInz6obpgDQGcFmaJgB',
+  'Grace (East African)': 'oWAxZDx7w5VEj9dCyTzz',
+  'Michael (West African)': 'flq6f7yk4E4fJM5XTYuZ',
+  
+  // Standard Voices
   'Aria': '9BWtsMINqrJLrRacOk9x',
   'Roger': 'CwhRBWXzGAHq8TQ4Fs17',
   'Sarah': 'EXAVITQu4vr4xnSDxMaL', 
@@ -31,7 +39,7 @@ export const useEnhancedTextToSpeech = () => {
   const [settings, setSettings] = useState<VoiceSettings>({
     provider: 'elevenlabs',
     quality: 'premium',
-    voice: 'Aria',
+    voice: 'Freya (Nigerian)', // Default to African accent for natural, localized experience
     speed: 0.95,
     pitch: 1.0
   });

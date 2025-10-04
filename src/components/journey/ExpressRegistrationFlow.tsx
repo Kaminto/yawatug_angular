@@ -18,10 +18,14 @@ import {
   Mail, 
   Shield,
   Clock,
-  Zap
+  Zap,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { toast } from 'sonner';
+import PasswordStrengthChecker from '@/components/auth/PasswordStrengthChecker';
 import type { AccountType, UserStatus } from '@/types/profile';
+import { RegistrationSuccess } from '@/components/auth/RegistrationSuccess';
 
 interface FormData {
   fullName: string;
@@ -30,6 +34,7 @@ interface FormData {
   accountType: AccountType | '';
   password: string;
   confirmPassword: string;
+  registrationMethod: 'email' | 'phone' | 'both';
 }
 
 const ExpressRegistrationFlow: React.FC = () => {
@@ -39,13 +44,18 @@ const ExpressRegistrationFlow: React.FC = () => {
   
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [registrationNumber, setRegistrationNumber] = useState('');
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
     phone: '',
     email: '',
     accountType: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    registrationMethod: 'both'
   });
 
   const focus = searchParams.get('focus') || 'general';
@@ -61,12 +71,18 @@ const ExpressRegistrationFlow: React.FC = () => {
     },
     {
       id: 2,
-      title: 'Contact',
+      title: 'Registration Method',
+      description: 'Choose email or phone',
+      icon: <Mail className="w-5 h-5" />
+    },
+    {
+      id: 3,
+      title: 'Contact Details',
       description: 'How to reach you',
       icon: <Phone className="w-5 h-5" />
     },
     {
-      id: 3,
+      id: 4,
       title: 'Security',
       description: 'Secure your account',
       icon: <Shield className="w-5 h-5" />
@@ -95,10 +111,17 @@ const ExpressRegistrationFlow: React.FC = () => {
       case 1:
         return formData.fullName.trim().length >= 2 && formData.accountType !== '';
       case 2:
-        return formData.phone.trim().length >= 10 && 
-               formData.email.trim().length >= 5 && 
-               formData.email.includes('@');
+        return true; // Method is always set by default
       case 3:
+        // Validate based on chosen method
+        if (formData.registrationMethod === 'email' || formData.registrationMethod === 'both') {
+          if (!formData.email.trim() || !formData.email.includes('@')) return false;
+        }
+        if (formData.registrationMethod === 'phone' || formData.registrationMethod === 'both') {
+          if (formData.phone.trim().length < 10) return false;
+        }
+        return true;
+      case 4:
         return formData.password.length >= 8 && 
                formData.password === formData.confirmPassword;
       default:
@@ -108,7 +131,7 @@ const ExpressRegistrationFlow: React.FC = () => {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      if (currentStep < 3) {
+      if (currentStep < 4) {
         setCurrentStep(prev => prev + 1);
       } else {
         handleSubmit();
@@ -127,7 +150,7 @@ const ExpressRegistrationFlow: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(3)) {
+    if (!validateStep(4)) {
       toast.error('Please complete all fields correctly');
       return;
     }
@@ -135,18 +158,40 @@ const ExpressRegistrationFlow: React.FC = () => {
     setLoading(true);
 
     try {
-      // Quick registration with minimal verification
+      // Determine auth email - use real email or generate temp for phone-only
+      const authEmail = formData.registrationMethod === 'phone' && !formData.email
+        ? `phone+${formData.phone.replace(/[^\d]/g, '')}@yawatu.app`
+        : formData.email;
+
+      // Pre-check for duplicates
+      const { data: duplicateCheck } = await supabase.rpc('check_user_status_public', {
+        p_email: formData.email || null,
+        p_phone: formData.phone || null
+      });
+
+      if ((duplicateCheck as any)?.exists) {
+        const method = formData.registrationMethod === 'email' ? 'email' : 'phone number';
+        if ((duplicateCheck as any)?.needs_activation) {
+          toast.warning(`This ${method} is already registered but not activated. Please check for activation instructions.`);
+        } else {
+          toast.error(`This ${method} is already registered. Try logging in or resetting your password.`);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Register with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
+        email: authEmail,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/onboarding?source=${source}&focus=${focus}`,
+          emailRedirectTo: `${window.location.origin}/dashboard`,
           data: {
             full_name: formData.fullName,
-            phone: formData.phone,
+            phone: formData.phone || null,
             account_type: formData.accountType,
-            referral_code: referralCode,
-            express_registration: true,
+            referral_code: referralCode || null,
+            registration_method: formData.registrationMethod,
             utm_source: source,
             utm_campaign: utmParams.utm_campaign
           }
@@ -154,52 +199,32 @@ const ExpressRegistrationFlow: React.FC = () => {
       });
 
       if (error) {
-        toast.error(error.message || 'Registration failed');
+        if (error.message.includes('already registered')) {
+          toast.error('This account already exists. Please try logging in instead.');
+        } else {
+          toast.error(error.message || 'Registration failed');
+        }
         return;
       }
 
       if (data.user) {
-        // Create profile with express registration flag
-        const profilePayload = {
-          id: data.user.id,
-          full_name: formData.fullName,
-          phone: formData.phone,
-          account_type: formData.accountType as AccountType,
-          email: formData.email,
-          referral_code: referralCode || null,
-          user_role: 'user' as const,
-          status: 'unverified' as UserStatus,
-          express_registration: true,
-          utm_source: source,
-          utm_campaign: utmParams.utm_campaign
-        };
-
-        const { error: insertError } = await supabase
+        // Fetch the generated registration number
+        const { data: profile } = await supabase
           .from('profiles')
-          .insert([profilePayload]);
+          .select('referral_code')
+          .eq('id', data.user.id)
+          .single();
 
-        if (insertError) {
-          console.error('Error creating profile:', insertError);
-          toast.error('Account created but profile setup failed. Please contact support.');
-          return;
+        if (profile?.referral_code) {
+          setRegistrationNumber(profile.referral_code);
         }
 
-        // Process referral if exists
-        if (referralCode) {
-          await supabase.rpc('process_signup_referral', {
-            p_user_id: data.user.id,
-            p_referral_code: referralCode
-          });
-        }
-
-        toast.success('Welcome to Yawatu! Let\'s get you started.');
-        
-        // Skip email verification for express users - redirect to onboarding
-        navigate(`/onboarding?source=${source}&focus=${focus}&express=true`);
+        toast.success(`Welcome to YAWATU! Your registration number is ${profile?.referral_code || 'being generated'}`);
+        setShowSuccess(true);
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      toast.error(error.message || 'Registration failed');
+      toast.error(error.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -255,31 +280,34 @@ const ExpressRegistrationFlow: React.FC = () => {
       case 2:
         return (
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="email">Email Address *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="your.email@example.com"
-                className="mt-1"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="phone">Phone Number *</Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="+256 700 000 000"
-                className="mt-1"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Used for transaction alerts and support
-              </p>
+            <div className="mb-4">
+              <h4 className="font-medium mb-3">How would you like to register?</h4>
+              <div className="space-y-2">
+                <Button
+                  variant={formData.registrationMethod === 'email' ? 'default' : 'outline'}
+                  className="w-full justify-start"
+                  onClick={() => setFormData(prev => ({ ...prev, registrationMethod: 'email' }))}
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  Email Only
+                </Button>
+                <Button
+                  variant={formData.registrationMethod === 'phone' ? 'default' : 'outline'}
+                  className="w-full justify-start"
+                  onClick={() => setFormData(prev => ({ ...prev, registrationMethod: 'phone' }))}
+                >
+                  <Phone className="w-4 h-4 mr-2" />
+                  Phone Only
+                </Button>
+                <Button
+                  variant={formData.registrationMethod === 'both' ? 'default' : 'outline'}
+                  className="w-full justify-start"
+                  onClick={() => setFormData(prev => ({ ...prev, registrationMethod: 'both' }))}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Both (Recommended)
+                </Button>
+              </div>
             </div>
           </div>
         );
@@ -287,28 +315,110 @@ const ExpressRegistrationFlow: React.FC = () => {
       case 3:
         return (
           <div className="space-y-4">
+            {(formData.registrationMethod === 'email' || formData.registrationMethod === 'both') && (
+              <div>
+                <Label htmlFor="email">Email Address *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="your.email@example.com"
+                  className="mt-1"
+                />
+              </div>
+            )}
+            
+            {(formData.registrationMethod === 'phone' || formData.registrationMethod === 'both') && (
+              <div>
+                <Label htmlFor="phone">Phone Number *</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+256 700 000 000"
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Used for transaction alerts and support
+                </p>
+              </div>
+            )}
+            
+            {formData.registrationMethod === 'email' && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  💡 You can add your phone number later for transaction alerts
+                </p>
+              </div>
+            )}
+            
+            {formData.registrationMethod === 'phone' && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  💡 You can add your email later for account notifications
+                </p>
+              </div>
+            )}
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="space-y-4">
             <div>
               <Label htmlFor="password">Create Password *</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                placeholder="Minimum 8 characters"
-                className="mt-1"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Minimum 8 characters"
+                  className="mt-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              {formData.password && (
+                <div className="mt-2">
+                  <PasswordStrengthChecker password={formData.password} />
+                </div>
+              )}
             </div>
             
             <div>
               <Label htmlFor="confirmPassword">Confirm Password *</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                placeholder="Re-enter your password"
-                className="mt-1"
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  placeholder="Re-enter your password"
+                  className="mt-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                <p className="text-sm text-destructive mt-1">Passwords do not match</p>
+              )}
             </div>
 
             <div className="p-3 bg-primary/5 rounded-lg">
@@ -333,73 +443,85 @@ const ExpressRegistrationFlow: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold mb-2">{content.headline}</h1>
-          <p className="text-muted-foreground">{content.subheadline}</p>
-          <Badge variant="secondary" className="mt-2">
-            <Clock className="w-3 h-3 mr-1" />
-            2 minutes to complete
-          </Badge>
-        </div>
+    <>
+      {showSuccess && registrationNumber ? (
+        <RegistrationSuccess
+          registrationNumber={registrationNumber}
+          registrationMethod={formData.registrationMethod === 'phone' ? 'phone' : 'email'}
+          email={formData.email}
+          phone={formData.phone}
+          variant="page"
+        />
+      ) : (
+        <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
+          <div className="w-full max-w-md">
+            {/* Header */}
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold mb-2">{content.headline}</h1>
+              <p className="text-muted-foreground">{content.subheadline}</p>
+              <Badge variant="secondary" className="mt-2">
+                <Clock className="w-3 h-3 mr-1" />
+                2 minutes to complete
+              </Badge>
+            </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center mb-4">
-              <CardTitle className="text-lg">
-                Step {currentStep} of {steps.length}
-              </CardTitle>
-              <div className="flex items-center gap-1">
-                {steps[currentStep - 1].icon}
-                <span className="text-sm font-medium">{steps[currentStep - 1].title}</span>
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center mb-4">
+                  <CardTitle className="text-lg">
+                    Step {currentStep} of {steps.length}
+                  </CardTitle>
+                  <div className="flex items-center gap-1">
+                    {steps[currentStep - 1].icon}
+                    <span className="text-sm font-medium">{steps[currentStep - 1].title}</span>
+                  </div>
+                </div>
+                <Progress value={(currentStep / steps.length) * 100} />
+              </CardHeader>
+
+              <CardContent>
+                <div className="mb-6">
+                  <h3 className="font-medium mb-1">{steps[currentStep - 1].title}</h3>
+                  <p className="text-sm text-muted-foreground">{steps[currentStep - 1].description}</p>
+                </div>
+
+                {renderStepContent()}
+
+                <div className="flex gap-3 mt-6">
+                  <Button
+                    onClick={handleBack}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </Button>
+                  
+                  <Button
+                    onClick={handleNext}
+                    disabled={!validateStep(currentStep) || loading}
+                    className="flex-1"
+                  >
+                    {loading ? 'Processing...' : currentStep === 4 ? 'Create Account' : 'Next'}
+                    {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Benefits footer */}
+            <div className="text-center mt-6">
+              <p className="text-sm text-muted-foreground">{content.benefit}</p>
+              <div className="flex justify-center items-center gap-4 mt-2 text-xs text-muted-foreground">
+                <span>✓ No setup fees</span>
+                <span>✓ Start with UGX 10K</span>
+                <span>✓ Instant access</span>
               </div>
             </div>
-            <Progress value={(currentStep / steps.length) * 100} />
-          </CardHeader>
-
-          <CardContent>
-            <div className="mb-6">
-              <h3 className="font-medium mb-1">{steps[currentStep - 1].title}</h3>
-              <p className="text-sm text-muted-foreground">{steps[currentStep - 1].description}</p>
-            </div>
-
-            {renderStepContent()}
-
-            <div className="flex gap-3 mt-6">
-              <Button
-                onClick={handleBack}
-                variant="outline"
-                className="flex-1"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-              
-              <Button
-                onClick={handleNext}
-                disabled={!validateStep(currentStep) || loading}
-                className="flex-1"
-              >
-                {loading ? 'Processing...' : currentStep === 3 ? 'Create Account' : 'Next'}
-                {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Benefits footer */}
-        <div className="text-center mt-6">
-          <p className="text-sm text-muted-foreground">{content.benefit}</p>
-          <div className="flex justify-center items-center gap-4 mt-2 text-xs text-muted-foreground">
-            <span>✓ No setup fees</span>
-            <span>✓ Start with UGX 10K</span>
-            <span>✓ Instant access</span>
           </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 };
 

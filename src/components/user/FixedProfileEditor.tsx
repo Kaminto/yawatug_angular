@@ -32,6 +32,7 @@ interface FixedProfileEditorProps {
 
 const FixedProfileEditor: React.FC<FixedProfileEditorProps> = ({ profile, onUpdate }) => {
   const [fullName, setFullName] = useState<string>(profile?.full_name || '');
+  const [email, setEmail] = useState<string>(profile?.email || '');
   const [phoneNumber, setPhoneNumber] = useState<string>(profile?.phone_number || '');
   const [address, setAddress] = useState<string>(profile?.address || '');
   const [city, setCity] = useState<string>(profile?.city || '');
@@ -42,6 +43,7 @@ const FixedProfileEditor: React.FC<FixedProfileEditorProps> = ({ profile, onUpda
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name || '');
+      setEmail(profile.email || '');
       setPhoneNumber(profile.phone_number || '');
       setAddress(profile.address || '');
       setCity(profile.city || '');
@@ -60,16 +62,57 @@ const FixedProfileEditor: React.FC<FixedProfileEditorProps> = ({ profile, onUpda
         return;
       }
 
+      const updateData: any = {
+        full_name: fullName,
+        phone_number: phoneNumber,
+        address: address,
+        city: city,
+        country: country,
+        bio: bio,
+      };
+
+      // Handle email update for temporary emails
+      const isTempEmail = profile?.email?.includes('@yawatu.app');
+      if (isTempEmail && email && email !== profile.email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          toast.error('Please enter a valid email address');
+          setLoading(false);
+          return;
+        }
+
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email)
+          .neq('id', profile.id)
+          .single();
+
+        if (existingProfile) {
+          toast.error('This email is already in use');
+          setLoading(false);
+          return;
+        }
+
+        updateData.email = email;
+
+        const { error: authError } = await supabase.auth.updateUser({
+          email: email
+        });
+
+        if (authError) {
+          toast.error('Failed to update email');
+          console.error('Auth email update error:', authError);
+          setLoading(false);
+          return;
+        }
+
+        toast.success('Email verification sent to your new email address');
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({
-          full_name: fullName,
-          phone_number: phoneNumber,
-          address: address,
-          city: city,
-          country: country,
-          bio: bio,
-        })
+        .update(updateData)
         .eq('id', profile.id);
 
       if (error) {
@@ -102,6 +145,24 @@ const FixedProfileEditor: React.FC<FixedProfileEditorProps> = ({ profile, onUpda
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
+          </div>
+          <div>
+            <Label htmlFor="email">
+              Email {profile?.email?.includes('@yawatu.app') && <span className="text-xs text-muted-foreground">(Temporary)</span>}
+            </Label>
+            <Input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={!profile?.email?.includes('@yawatu.app')}
+              placeholder={profile?.email?.includes('@yawatu.app') ? "Enter your real email" : ""}
+            />
+            {profile?.email?.includes('@yawatu.app') && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Add your real email to receive important notifications
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="phoneNumber">Phone Number</Label>

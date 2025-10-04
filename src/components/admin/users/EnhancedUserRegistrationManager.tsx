@@ -210,6 +210,105 @@ const EnhancedUserRegistrationManager = () => {
     }
   };
 
+  const handleBulkActivation = async () => {
+    if (selectedUsers.length === 0) return;
+    
+    setBulkLoading(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // Get full user details for selected users
+      const { data: selectedUserData, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', selectedUsers);
+
+      if (fetchError) throw fetchError;
+
+      // Filter for imported users that need activation
+      const usersToActivate = selectedUserData?.filter(u => 
+        u.import_batch_id && 
+        u.email &&
+        (!u.account_activation_status || u.account_activation_status === 'pending')
+      ) || [];
+
+      if (usersToActivate.length === 0) {
+        toast.error('No eligible users for activation. Users must be imported and have an email.');
+        setBulkLoading(false);
+        return;
+      }
+
+      toast.info(`Sending activation emails to ${usersToActivate.length} users...`);
+
+      for (const user of usersToActivate) {
+        try {
+          // Generate invitation token
+          const { data: tokenData, error: tokenError } = await supabase
+            .rpc('generate_invitation_token', {
+              p_user_id: user.id
+            });
+
+          if (tokenError) {
+            console.error(`Token generation failed for ${user.email}:`, tokenError);
+            failCount++;
+            continue;
+          }
+
+          const activationUrl = `${window.location.origin}/activate?token=${tokenData}`;
+
+          // Send activation email
+          const { error: emailError } = await supabase.functions.invoke('unified-communication-sender', {
+            body: {
+              recipient: user.email,
+              recipient_name: user.full_name || 'User',
+              communication_type: 'activation_email',
+              channels: ['email'],
+              email_data: {
+                subject: 'Activate Your Yawatu Account',
+                activation_url: activationUrl,
+                user_name: user.full_name || 'User'
+              }
+            }
+          });
+
+          if (emailError) {
+            console.error(`Email send failed for ${user.email}:`, emailError);
+            failCount++;
+          } else {
+            // Update activation status
+            await supabase
+              .from('profiles')
+              .update({ account_activation_status: 'invited' })
+              .eq('id', user.id);
+            
+            successCount++;
+          }
+
+        } catch (error) {
+          console.error(`Failed to activate user ${user.email}:`, error);
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Successfully sent ${successCount} activation emails`);
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to send ${failCount} activation emails`);
+      }
+
+      setSelectedUsers([]);
+      loadUsers();
+
+    } catch (error) {
+      console.error('Error in bulk activation:', error);
+      toast.error('Failed to process bulk activation');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   const handleStatusChange = async (userId: string, newStatus: UserStatus) => {
     try {
       const { error } = await supabase
@@ -447,16 +546,39 @@ const EnhancedUserRegistrationManager = () => {
                     <DropdownMenuContent>
                       <DropdownMenuItem onClick={() => handleBulkStatusChange('active')}>
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Activate All
+                        Set Status: Active
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleBulkStatusChange('blocked')}>
                         <Ban className="h-4 w-4 mr-2" />
-                        Block All
+                        Set Status: Blocked
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleBulkStatusChange('pending_verification')}>
                         <Clock className="h-4 w-4 mr-2" />
-                        Set Pending All
+                        Set Status: Pending
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            <Mail className="h-4 w-4 mr-2" />
+                            Send Activation Emails
+                          </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Send Activation Emails</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will send activation emails to all selected imported users who have email addresses and are pending activation. Each user will receive a unique activation link valid for 30 days.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleBulkActivation}>
+                              Send Emails
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                       <DropdownMenuSeparator />
                       <AlertDialog>
                         <AlertDialogTrigger asChild>

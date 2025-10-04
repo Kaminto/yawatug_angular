@@ -4,7 +4,6 @@ import { UnifiedLayout } from '@/components/layout/UnifiedLayout';
 import AdminWalletApprovalDashboard from '@/components/admin/wallet/AdminWalletApprovalDashboard';
 import { CrossModuleDataProvider } from '@/components/admin/shared/CrossModuleDataProvider';
 import { AdminHeader } from '@/components/admin/shared/AdminHeader';
-import { AdminAIAssistant } from '@/components/admin/ai/AdminAIAssistant';
 import { useWalletDebug } from '@/hooks/useWalletDebug';
 
 const AdminWalletApprovals = () => {
@@ -26,7 +25,6 @@ const AdminWalletApprovals = () => {
       <UnifiedLayout title="Transaction Approvals" breadcrumbs={breadcrumbs}>
         <AdminHeader />
         <AdminWalletApprovalDashboard />
-        <AdminAIAssistant />
       </UnifiedLayout>
     </CrossModuleDataProvider>
   );

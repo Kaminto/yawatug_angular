@@ -2,38 +2,24 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Gift, TrendingUp, Share, Award, Coins } from "lucide-react";
+import { Users, Gift, TrendingUp, Share, Award, Coins, Trophy } from "lucide-react";
 import referralsImage from "@/assets/images/icons/referrals.jpg";
 
 const ReferralProgram = () => {
   const referralTiers = [
     {
-      tier: "Bronze",
-      referrals: "1-9",
-      commission: "5%",
-      bonus: "100 UGX per referral",
-      benefits: ["Basic referral tracking", "Monthly payouts", "Email support"]
+      tier: "Level 1",
+      type: "Cash Commission",
+      reward: "5%",
+      description: "Direct referral commission",
+      benefits: ["Cash on pool purchases", "Instant payouts after KYC", "90-day eligibility"]
     },
     {
-      tier: "Silver", 
-      referrals: "10-24",
-      commission: "7%",
-      bonus: "200 UGX per referral",
-      benefits: ["Advanced analytics", "Bi-weekly payouts", "Priority support", "Marketing materials"]
-    },
-    {
-      tier: "Gold",
-      referrals: "25-49", 
-      commission: "10%",
-      bonus: "500 UGX per referral",
-      benefits: ["Premium dashboard", "Weekly payouts", "Dedicated support", "Custom referral codes", "Bonus shares"]
-    },
-    {
-      tier: "Platinum",
-      referrals: "50+",
-      commission: "15%",
-      bonus: "1,000 UGX per referral", 
-      benefits: ["VIP treatment", "Daily payouts", "Personal account manager", "Exclusive events", "Maximum bonuses"]
+      tier: "Level 2", 
+      type: "Credit Rewards",
+      reward: "1 Credit / 10 Shares",
+      description: "Network activity rewards",
+      benefits: ["Convert to shares", "Enter Grand Draw", "Accumulate over time", "No expiry"]
     }
   ];
 
@@ -53,25 +39,21 @@ const ReferralProgram = () => {
     {
       step: 3,
       title: "They Invest",
-      description: "When someone uses your code to purchase shares, they become your successful referral.",
+      description: "When someone uses your code to purchase shares from the pool, you earn commission and credits.",
       icon: TrendingUp
     },
     {
       step: 4,
-      title: "Earn Commissions",
-      description: "Receive your commission and bonuses based on their investment amount and your tier level.",
+      title: "Earn & Win",
+      description: "Receive cash commissions and credits. Use credits to enter draws or convert to shares.",
       icon: Coins
     }
   ];
 
   const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "Bronze": return "bg-orange-600";
-      case "Silver": return "bg-gray-500";
-      case "Gold": return "bg-yellow-500"; 
-      case "Platinum": return "bg-purple-600";
-      default: return "bg-gray-500";
-    }
+    if (tier.includes("Level 1")) return "bg-green-600";
+    if (tier.includes("Level 2")) return "bg-purple-600";
+    return "bg-gray-500";
   };
 
   return (
@@ -85,7 +67,7 @@ const ReferralProgram = () => {
                 Referral Program
               </h1>
               <p className="text-xl text-muted-foreground mb-8">
-                Earn commissions and bonuses by referring friends and family to invest in Yawatu shares. The more you refer, the more you earn!
+                Earn cash commissions, collect credits, and win prizes through our Grand Draw system. The more you refer, the more you earn and win!
               </p>
               <div className="flex gap-4">
                 <Button size="lg" className="bg-primary hover:bg-primary/90" onClick={() => window.location.href = '/register-new'}>
@@ -107,11 +89,11 @@ const ReferralProgram = () => {
         </div>
       </section>
 
-      {/* Commission Structure */}
+      {/* Reward Structure */}
       <section className="py-16">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">Referral Tiers & Commissions</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <h2 className="text-3xl font-bold text-center mb-12">Two-Tier Reward System</h2>
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {referralTiers.map((tier, index) => (
               <Card key={index} className="relative overflow-hidden">
                 <div className={`absolute top-0 left-0 right-0 h-1 ${getTierColor(tier.tier)}`} />
@@ -119,15 +101,11 @@ const ReferralProgram = () => {
                   <Badge className={`${getTierColor(tier.tier)} text-white w-fit mx-auto mb-2`}>
                     {tier.tier}
                   </Badge>
-                  <CardTitle className="text-xl">{tier.referrals} Referrals</CardTitle>
-                  <div className="text-3xl font-bold text-primary">{tier.commission}</div>
-                  <p className="text-sm text-muted-foreground">Commission Rate</p>
+                  <CardTitle className="text-xl">{tier.type}</CardTitle>
+                  <div className="text-3xl font-bold text-primary">{tier.reward}</div>
+                  <p className="text-sm text-muted-foreground">{tier.description}</p>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center mb-4">
-                    <div className="font-semibold text-lg">{tier.bonus}</div>
-                    <p className="text-sm text-muted-foreground">Sign-up Bonus</p>
-                  </div>
                   <div className="space-y-2">
                     <h4 className="font-semibold text-sm">Benefits:</h4>
                     <ul className="text-xs text-muted-foreground space-y-1">
@@ -171,13 +149,67 @@ const ReferralProgram = () => {
         </div>
       </section>
 
+      {/* Grand Draw Section */}
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <Trophy className="h-16 w-16 mx-auto text-yellow-500 mb-4" />
+            <h2 className="text-3xl font-bold mb-4">Grand Draw System</h2>
+            <p className="text-xl text-muted-foreground">
+              Stake your credits for a chance to win big! 3 winners share the prize pool every draw.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            <Card className="text-center">
+              <CardHeader>
+                <div className="text-5xl mb-2">🥇</div>
+                <CardTitle>1st Prize</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-yellow-600">50%</div>
+                <p className="text-muted-foreground mt-2">
+                  Of prize pool in shares
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="text-center">
+              <CardHeader>
+                <div className="text-5xl mb-2">🥈</div>
+                <CardTitle>2nd Prize</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-gray-600">30%</div>
+                <p className="text-muted-foreground mt-2">
+                  Of prize pool in shares
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="text-center">
+              <CardHeader>
+                <div className="text-5xl mb-2">🥉</div>
+                <CardTitle>3rd Prize</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-orange-600">20%</div>
+                <p className="text-muted-foreground mt-2">
+                  Of prize pool in shares
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Referral Benefits */}
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-12">
             <h2 className="text-3xl font-bold mb-4">Why Join Our Referral Program?</h2>
             <p className="text-xl text-muted-foreground">
-              Our referral program offers industry-leading commissions and benefits to help you maximize your earnings.
+              Our enhanced referral program offers cash commissions, credit rewards, and exciting prize draws to maximize your earnings.
             </p>
           </div>
           
@@ -185,23 +217,23 @@ const ReferralProgram = () => {
             <Card>
               <CardHeader>
                 <Gift className="h-12 w-12 text-primary mb-4" />
-                <CardTitle>High Commissions</CardTitle>
+                <CardTitle>Dual Rewards</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Earn up to 15% commission on every successful referral, plus additional sign-up bonuses for each new investor.
+                  Earn cash commissions from pool purchases AND collect credits from network activity for maximum benefits.
                 </p>
               </CardContent>
             </Card>
             
             <Card>
               <CardHeader>
-                <Award className="h-12 w-12 text-primary mb-4" />
-                <CardTitle>Tier Progression</CardTitle>
+                <Trophy className="h-12 w-12 text-primary mb-4" />
+                <CardTitle>Grand Draw Prizes</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Advance through our tier system to unlock higher commission rates and exclusive benefits.
+                  Stake credits to enter draws with transparent results. Win shares worth up to 50% of the prize pool!
                 </p>
               </CardContent>
             </Card>
@@ -209,11 +241,11 @@ const ReferralProgram = () => {
             <Card>
               <CardHeader>
                 <TrendingUp className="h-12 w-12 text-primary mb-4" />
-                <CardTitle>Passive Income</CardTitle>
+                <CardTitle>Transparent & Fair</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Build a network of investors and earn ongoing commissions from their continued investments and reinvestments.
+                  KYC-verified rewards ensure fairness. Draw results are public and archived for complete transparency.
                 </p>
               </CardContent>
             </Card>
@@ -285,7 +317,7 @@ const ReferralProgram = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Start Earning?</h2>
           <p className="text-xl mb-8 opacity-90">
-            Join our referral program today and start earning commissions by sharing Yawatu investment opportunities.
+            Join our enhanced referral program today and start earning commissions, credits, and winning prizes.
           </p>
           <Button size="lg" variant="secondary" onClick={() => window.location.href = '/register-new'}>
             Get Your Referral Code

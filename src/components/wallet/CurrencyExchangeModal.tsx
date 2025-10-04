@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeftRight, AlertCircle } from 'lucide-react';
+import { ArrowLeftRight, AlertCircle, Info } from 'lucide-react';
 
 interface CurrencyExchangeModalProps {
   isOpen: boolean;
@@ -34,7 +36,26 @@ const CurrencyExchangeModal: React.FC<CurrencyExchangeModalProps> = ({
   const [amount, setAmount] = useState(requiredAmount || 0);
   const [exchangeRate, setExchangeRate] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [exchangeRates, setExchangeRates] = useState<any[]>([]);
 
+  // Load active exchange rates to power dropdowns
+  useEffect(() => {
+    const loadRates = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('exchange_rates')
+          .select('*')
+          .eq('is_active', true);
+        if (error) throw error;
+        console.log('Modal: exchange rates loaded', data);
+        setExchangeRates(data || []);
+      } catch (err) {
+        console.error('Modal: failed to load exchange rates', err);
+        toast.error('Failed to load exchange rates');
+      }
+    };
+    loadRates();
+  }, []);
   useEffect(() => {
     if (requiredCurrency) {
       setToCurrency(requiredCurrency);
@@ -81,15 +102,31 @@ const CurrencyExchangeModal: React.FC<CurrencyExchangeModalProps> = ({
       if (!user) throw new Error('Not authenticated');
 
       const fromWallet = wallets.find(w => w.currency === fromCurrency);
-      const toWallet = wallets.find(w => w.currency === toCurrency);
-
-      if (!fromWallet || !toWallet) throw new Error('Wallets not found');
+      if (!fromWallet) throw new Error('Source wallet not found');
 
       const convertedAmount = amount * exchangeRate;
       const fee = amount * 0.02; // 2% exchange fee
 
       if (fromWallet.balance < (amount + fee)) {
         throw new Error('Insufficient balance including exchange fee');
+      }
+
+      // Check if target wallet exists, create if not
+      let toWallet = wallets.find(w => w.currency === toCurrency);
+      if (!toWallet) {
+        const { data: newWallet, error: walletError } = await supabase
+          .from('wallets')
+          .insert({
+            user_id: user.id,
+            currency: toCurrency,
+            balance: 0,
+            status: 'active'
+          })
+          .select()
+          .single();
+        
+        if (walletError) throw walletError;
+        toWallet = newWallet;
       }
 
       // Create exchange request
@@ -134,16 +171,55 @@ const CurrencyExchangeModal: React.FC<CurrencyExchangeModalProps> = ({
   const convertedAmount = amount * exchangeRate;
   const fee = amount * 0.02;
 
+  const fromCurrenciesList = React.useMemo(() => {
+    const froms = exchangeRates.map((r: any) => r.from_currency);
+    const unique = Array.from(new Set(froms));
+    const userCurrencies = wallets.map((w) => w.currency);
+    const sorted = unique.sort((a, b) => {
+      const aHas = userCurrencies.includes(a);
+      const bHas = userCurrencies.includes(b);
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      return a.localeCompare(b);
+    });
+    console.log('Modal: from currencies', sorted);
+    return sorted;
+  }, [exchangeRates, wallets]);
+
+  const toCurrenciesForSelected = React.useMemo(() => {
+    if (!fromCurrency) return [] as string[];
+    const targets = exchangeRates
+      .filter((r: any) => r.from_currency === fromCurrency)
+      .map((r: any) => r.to_currency);
+    const unique = Array.from(new Set(targets));
+    const userCurrencies = wallets.map((w) => w.currency);
+    const sorted = unique.sort((a, b) => {
+      const aHas = userCurrencies.includes(a);
+      const bHas = userCurrencies.includes(b);
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      return a.localeCompare(b);
+    });
+    console.log('Modal: to currencies for', fromCurrency, sorted);
+    return sorted;
+  }, [exchangeRates, wallets, fromCurrency]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" aria-describedby="exchange-desc">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ArrowLeftRight className="h-5 w-5" />
             Currency Exchange
           </DialogTitle>
         </DialogHeader>
-        
+        <p id="exchange-desc" className="sr-only">Exchange currencies between your wallets. Rates are set by administrators.</p>
+        <Alert className="mb-2 border-blue-200 bg-blue-50">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            Exchange rates are configured by administrators and used across the app.
+          </AlertDescription>
+        </Alert>
         <div className="space-y-4">
           {purpose && (
             <Card className="border-amber-200 bg-amber-50">
@@ -158,32 +234,64 @@ const CurrencyExchangeModal: React.FC<CurrencyExchangeModalProps> = ({
 
           <div>
             <Label>From Currency</Label>
-            <Select value={fromCurrency} onValueChange={setFromCurrency}>
+            <Select value={fromCurrency} onValueChange={setFromCurrency} onOpenChange={(open) => console.log('Modal: From currency select open:', open)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select currency to exchange from" />
               </SelectTrigger>
-              <SelectContent>
-                {wallets.filter(w => w.currency !== toCurrency).map(wallet => (
-                  <SelectItem key={wallet.currency} value={wallet.currency}>
-                    {wallet.currency} - {wallet.balance.toLocaleString()}
-                  </SelectItem>
-                ))}
+              <SelectContent position="popper" className="bg-background z-[1000] shadow-md border">
+                {fromCurrenciesList.length === 0 ? (
+                  <div className="p-2 text-sm text-muted-foreground">No currencies available</div>
+                ) : (
+                  fromCurrenciesList.map((c: string) => {
+                    const wallet = wallets.find(w => w.currency === c);
+                    const hasWallet = !!wallet;
+                    return (
+                      <SelectItem key={c} value={c}>
+                        <div className="flex items-center justify-between w-full gap-2">
+                          <span className={!hasWallet ? 'text-muted-foreground' : ''}>{c}</span>
+                          {hasWallet ? (
+                            <Badge variant="outline">{c} {wallet.balance.toLocaleString()}</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">No wallet</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })
+                )}
               </SelectContent>
             </Select>
           </div>
 
           <div>
             <Label>To Currency</Label>
-            <Select value={toCurrency} onValueChange={setToCurrency} disabled={!!requiredCurrency}>
+            <Select value={toCurrency} onValueChange={setToCurrency} disabled={!!requiredCurrency} onOpenChange={(open) => console.log('Modal: To currency select open:', open)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select currency to exchange to" />
               </SelectTrigger>
-              <SelectContent>
-                {wallets.filter(w => w.currency !== fromCurrency).map(wallet => (
-                  <SelectItem key={wallet.currency} value={wallet.currency}>
-                    {wallet.currency}
-                  </SelectItem>
-                ))}
+              <SelectContent className="bg-popover z-50">
+                {!fromCurrency ? (
+                  <div className="p-2 text-sm text-muted-foreground">Select source currency first</div>
+                ) : toCurrenciesForSelected.length === 0 ? (
+                  <div className="p-2 text-sm text-muted-foreground">No target currencies configured</div>
+                ) : (
+                  toCurrenciesForSelected.map((c: string) => {
+                    const wallet = wallets.find(w => w.currency === c);
+                    const hasWallet = !!wallet;
+                    return (
+                      <SelectItem key={c} value={c}>
+                        <div className="flex items-center justify-between w-full gap-2">
+                          <span className={!hasWallet ? 'text-muted-foreground' : ''}>{c}</span>
+                          {hasWallet ? (
+                            <Badge variant="outline">{c} {wallet.balance.toLocaleString()}</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">No wallet</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })
+                )}
               </SelectContent>
             </Select>
           </div>

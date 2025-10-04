@@ -14,12 +14,13 @@ import { supabase } from '@/integrations/supabase/client';
 import EnhancedWalletDepositForm from '@/components/wallet/EnhancedWalletDepositForm';
 import EnhancedWalletWithdrawForm from '@/components/wallet/EnhancedWalletWithdrawForm';
 import WalletTransferForm from '@/components/wallet/WalletTransferForm';
+import WalletExchangeForm from '@/components/wallet/WalletExchangeForm';
 import SmartPaymentSuggestions from '@/components/wallet/SmartPaymentSuggestions';
 import PredictiveBalanceWidget from '@/components/wallet/PredictiveBalanceWidget';
 
 const UserWallet = () => {
   const { wallets, balances, loading, getBalance, refreshWallets, userId } = useUser();
-  const [activeModal, setActiveModal] = useState<'deposit' | 'withdraw' | 'transfer' | null>(null);
+  const [activeModal, setActiveModal] = useState<'deposit' | 'withdraw' | 'transfer' | 'exchange' | null>(null);
   const [activeTab, setActiveTab] = useState('balance');
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
 
@@ -68,8 +69,27 @@ const UserWallet = () => {
 
   const ugxBalance = getBalance('UGX');
   const usdBalance = getBalance('USD');
-  const exchangeRate = 3700;
-  const totalEquivalentUGX = ugxBalance + (usdBalance * exchangeRate);
+  const [exchangeRate, setExchangeRate] = useState<number>(3700);
+  
+  // Fetch real exchange rate from database
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      const { data, error } = await supabase
+        .from('exchange_rates')
+        .select('rate')
+        .eq('from_currency', 'USD')
+        .eq('to_currency', 'UGX')
+        .eq('is_active', true)
+        .single();
+      
+      if (data && !error) {
+        setExchangeRate(data.rate);
+      }
+    };
+    fetchExchangeRate();
+  }, []);
+  
+  const totalEquivalentUGX = ugxBalance + (Math.max(0, usdBalance) * exchangeRate);
 
   if (loading) {
     return (
@@ -92,14 +112,54 @@ const UserWallet = () => {
     <UserLayout title="My Wallet" breadcrumbs={breadcrumbs}>
       <MobileBottomPadding>
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden">
-          {/* Enhanced Tab Navigation */}
+          {/* Quick Actions Header */}
+          <Card className="w-full max-w-full overflow-hidden">
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-primary/10 hover:border-primary"
+                  onClick={() => setActiveModal('deposit')}
+                >
+                  <Plus className="h-5 w-5 text-primary" />
+                  <span className="text-sm font-medium">Deposit</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-secondary/10 hover:border-secondary"
+                  onClick={() => setActiveModal('withdraw')}
+                >
+                  <Minus className="h-5 w-5 text-secondary" />
+                  <span className="text-sm font-medium">Withdraw</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-primary/10 hover:border-primary"
+                  onClick={() => setActiveModal('transfer')}
+                >
+                  <ArrowLeftRight className="h-5 w-5 text-primary" />
+                  <span className="text-sm font-medium">Transfer</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center gap-2 h-auto py-4 hover:bg-accent/10 hover:border-accent"
+                  onClick={() => setActiveModal('exchange')}
+                >
+                  <ArrowLeftRight className="h-5 w-5 text-accent" />
+                  <span className="text-sm font-medium">Exchange</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tab Navigation - Only Balance and History */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 h-12 mb-6">
+            <TabsList className="grid w-full grid-cols-2 h-12 mb-6">
               <TabsTrigger value="balance" className="text-sm font-medium">
                 Balance
-              </TabsTrigger>
-              <TabsTrigger value="actions" className="text-sm font-medium">
-                Actions
               </TabsTrigger>
               <TabsTrigger value="history" className="text-sm font-medium">
                 History
@@ -132,6 +192,26 @@ const UserWallet = () => {
                 />
               )}
 
+              {/* Currency Exchange Card */}
+              <Card className="w-full max-w-full overflow-hidden">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Currency Exchange
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() => setActiveModal('exchange')}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <ArrowLeftRight className="h-4 w-4 mr-2" />
+                    Exchange Currency
+                  </Button>
+                </CardContent>
+              </Card>
+
               {/* Balance Overview */}
               <Card className="w-full max-w-full overflow-hidden">
                 <CardHeader>
@@ -148,9 +228,12 @@ const UserWallet = () => {
                       <span className="text-sm font-medium truncate">UGX Wallet</span>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-xl font-bold break-all">
+                      <p className={`text-xl font-bold break-all ${ugxBalance < 0 ? 'text-destructive' : ''}`}>
                         {formatCurrency(ugxBalance, 'UGX')}
                       </p>
+                      {ugxBalance < 0 && (
+                        <p className="text-xs text-destructive">Negative balance detected</p>
+                      )}
                     </div>
                   </div>
 
@@ -161,9 +244,12 @@ const UserWallet = () => {
                       <span className="text-sm font-medium truncate">USD Wallet</span>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-xl font-bold break-all">
+                      <p className={`text-xl font-bold break-all ${usdBalance < 0 ? 'text-destructive' : ''}`}>
                         {formatCurrency(usdBalance, 'USD')}
                       </p>
+                      {usdBalance < 0 && (
+                        <p className="text-xs text-destructive">Negative balance detected</p>
+                      )}
                     </div>
                   </div>
 
@@ -177,54 +263,6 @@ const UserWallet = () => {
                       <p className="text-xl font-bold text-accent break-all">
                         {formatCurrency(totalEquivalentUGX, 'UGX')}
                       </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="actions" className="space-y-4 w-full max-w-full overflow-hidden">
-              {/* Quick Actions */}
-              <Card className="w-full max-w-full overflow-hidden">
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="flex flex-col items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-16 w-16 rounded-xl border-2 border-primary/30 hover:border-primary hover:bg-primary/10"
-                        onClick={() => setActiveModal('deposit')}
-                      >
-                        <Plus className="h-8 w-8 text-primary" />
-                      </Button>
-                      <span className="text-sm font-medium">Deposit</span>
-                    </div>
-                    
-                    <div className="flex flex-col items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-16 w-16 rounded-xl border-2 border-secondary/30 hover:border-secondary hover:bg-secondary/10"
-                        onClick={() => setActiveModal('withdraw')}
-                      >
-                        <Minus className="h-8 w-8 text-secondary" />
-                      </Button>
-                      <span className="text-sm font-medium">Withdraw</span>
-                    </div>
-                    
-                    <div className="flex flex-col items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-16 w-16 rounded-xl border-2 border-primary/30 hover:border-primary hover:bg-primary/10"
-                        onClick={() => setActiveModal('transfer')}
-                      >
-                        <ArrowLeftRight className="h-8 w-8 text-primary" />
-                      </Button>
-                      <span className="text-sm font-medium">Transfer</span>
                     </div>
                   </div>
                 </CardContent>
@@ -309,6 +347,15 @@ const UserWallet = () => {
               wallets={wallets}
               onTransferComplete={handleTransactionComplete}
             />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={activeModal === 'exchange'} onOpenChange={() => setActiveModal(null)}>
+          <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-lg sm:text-xl">Currency Exchange</DialogTitle>
+            </DialogHeader>
+            <WalletExchangeForm onExchangeComplete={handleTransactionComplete} />
           </DialogContent>
         </Dialog>
       </MobileBottomPadding>
